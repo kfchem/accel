@@ -1,4 +1,3 @@
-import datetime
 import subprocess
 import sys
 from pathlib import Path
@@ -13,22 +12,14 @@ for _l in _ls:
         old_ver = _l.split()[2]
         break
 
-new_ver = str(datetime.date.today().strftime("%Y%m%d")) + "01"
-
-
-def rec_ver(_ver: str):
-    if old_ver[:8] == _ver[:8] and int(old_ver[2:]) >= int(_ver[2:]):
-        _ver = str(int(_ver) + 1)
-        return rec_ver(_ver)
-    else:
-        return _ver
-
-
-new_ver = rec_ver(new_ver)
+old_ver = old_ver.replace("'", "").replace('"', "")
+old_ver_list = [int(s) for s in old_ver.split(".")]
+old_ver_list[-1] += 1
+new_ver = ".".join([str(s) for s in old_ver_list])
 
 for i, _l in enumerate(_ls):
     if "__version__ = " in _l:
-        _ls[i] = f"__version__ = {new_ver}\n"
+        _ls[i] = f'__version__ = "{new_ver}"\n'
         break
 
 with init_path.open("w", newline="\n") as f:

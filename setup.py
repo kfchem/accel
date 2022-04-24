@@ -5,22 +5,25 @@ from setuptools import find_packages, setup
 with open("README.rst") as f:
     readme = f.read()
 
-with open("LICENSE") as f:
-    license = f.read()
-
 with Path("accel").joinpath("__init__.py").open("r") as f:
-    _version = f.readline().split()[2]
+    _version = f.readline().split()[2].replace("'", "").replace('"', "")
 
 setup(
     name="accel",
     version=_version,
-    description="python package for manimuplating multiple conformers",
+    description="automated computational chemistry library specialized for handling large numbers of conformational isomers",
     long_description=readme,
     author="Keisuke Fukaya",
     author_email="kfukaya@pu-toyama.ac.jp",
-    url="httpx://github.com/kfchem/accel",
-    license=license,
+    url="https://github.com/kfchem/accel",
+    license="MIT License",
     install_requires=["numpy"],
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires=">=3.6",
     packages=find_packages(exclude=("tests", "docs", "application")),
 )
 """
