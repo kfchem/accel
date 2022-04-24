@@ -25,9 +25,5 @@ setup(
     ],
     python_requires=">=3.6",
     packages=find_packages(exclude=("tests", "docs", "application")),
+    include_package_data=True,
 )
-"""
-change __version__
-python setup.py bdist_wheel
-python setup.py clean --all
-"""

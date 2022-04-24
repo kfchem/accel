@@ -75,6 +75,10 @@ class BoxCore:
             raise TypeError
         return self
 
+    def show(self):
+        self.mols.show()
+        return self
+
     def labeling(self, separator: str = "_", index_list: List[int] = [0, 1]):
         for _c in self._mols:
             sp_stem = _c.name.split(separator)
