@@ -140,3 +140,4 @@ cython_debug/
 # test output files
 tests/test_output/
 tests/test_files/
+tests/*
