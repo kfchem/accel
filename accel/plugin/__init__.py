@@ -1,8 +1,8 @@
 from accel.base.boxcore import BoxCore
-from accel.plugin.gaulib import GauPlugin
-from accel.plugin.orclib import OrcPlugin
-from accel.plugin.pbslib import PbsPlugin
-from accel.plugin.txtlib import TxtPlugin
+from accel.plugin.gaulib import GauBox
+from accel.plugin.orclib import OrcBox
+from accel.plugin.pbslib import PbsBox
+from accel.plugin.txtlib import TxtBox
 
 
 class Plugins:
@@ -11,16 +11,16 @@ class Plugins:
 
     @property
     def gau(self):
-        return GauPlugin(self.box)
+        return GauBox(self.box)
 
     @property
     def orc(self):
-        return OrcPlugin(self.box)
+        return OrcBox(self.box)
 
     @property
     def pbs(self):
-        return PbsPlugin(self.box)
+        return PbsBox(self.box)
 
     @property
     def txt(self):
-        return TxtPlugin(self.box)
+        return TxtBox(self.box)

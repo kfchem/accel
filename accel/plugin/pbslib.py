@@ -50,7 +50,7 @@ def is_pbs_jobscript(_p: Path) -> bool:
     return False
 
 
-class PbsPlugin(BoxCore):
+class PbsBox(BoxCore):
     @Selectors.submit.add("app/pbs/jobscript")
     def submit(self):
         for _c in self.pack():

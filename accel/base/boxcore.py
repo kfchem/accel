@@ -400,10 +400,10 @@ class BoxCore:
         logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
         return self
 
-    def map_numbers(self, reference_mulcos: "BoxCore" = None):
-        if reference_mulcos is None:
-            reference_mulcos = BoxCore([_confs.get() for _confs in self.pack().labels.values()])
-        r_mulcos = reference_mulcos.get_duplicate()
+    def map_numbers(self, reference_box: "BoxCore" = None):
+        if reference_box is None:
+            reference_box = BoxCore([_confs.get() for _confs in self.pack().labels.values()])
+        r_mulcos = reference_box.get_duplicate()
         r_mulcos.calc_bonds()
         r_mulcos.calc_symm()
         topology.map_numbers(self.pack(), r_mulcos._mols)

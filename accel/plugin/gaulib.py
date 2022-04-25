@@ -385,7 +385,7 @@ def submit(_c: Mol):
         logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
 
 
-class GauPlugin(BoxCore):
+class GauBox(BoxCore):
     @Selectors.read_atoms.add("app/g16/output")
     def read_atoms(self, source: str = "archive"):
         """

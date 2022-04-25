@@ -15,7 +15,7 @@ def line_formatter(new_line):
     return ret_lines
 
 
-class TxtPlugin(BoxCore):
+class TxtBox(BoxCore):
     def read_text(self):
         for _c in self.pack():
             with _c.path.open() as f:

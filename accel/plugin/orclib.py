@@ -113,7 +113,7 @@ def submit(_c: Mol):
         logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
 
 
-class OrcPlugin(BoxCore):
+class OrcBox(BoxCore):
     @Selectors.check_end.add("app/orca/output")
     def check_end(self):
         for _c in self.pack():
