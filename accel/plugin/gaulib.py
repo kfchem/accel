@@ -61,7 +61,10 @@ def read_vibration(mulcos: BoxCore, freq_number: int = 1):
 
 
 def check_bonding(
-    mulcos: BoxCore, bonding_atoms: List[int], additional_valid_range: int = 0, acceptable_invalid_atoms: int = 0,
+    mulcos: BoxCore,
+    bonding_atoms: List[int],
+    additional_valid_range: int = 0,
+    acceptable_invalid_atoms: int = 0,
 ):
     for _c in mulcos.pack():
         _dists = []

@@ -14,7 +14,7 @@ def aromatize(_c: Mol, single_threshold: int = 1.01, double_threshold: int = 1.0
     _atoms = _c.atoms.to_list()
     npxyz = [[_a.x, _a.y, _a.z] for _a in _atoms]
     npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
-    npdist_mat = np.sqrt(np.sum(npdist_mat ** 2, axis=-1))
+    npdist_mat = np.sqrt(np.sum(npdist_mat**2, axis=-1))
 
     npcov = [Elements.get_element(_a.symbol)["single"] for _a in _atoms]
     npcov = [_v if _v is not None else np.nan for _v in npcov]
@@ -89,7 +89,7 @@ def embed_bonds(_c: Mol, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, 
     _atoms = _c.atoms.to_list()
     npxyz = [[_a.x, _a.y, _a.z] for _a in _atoms]
     npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
-    npdist_mat = np.sqrt(np.sum(npdist_mat ** 2, axis=-1))
+    npdist_mat = np.sqrt(np.sum(npdist_mat**2, axis=-1))
 
     npcov = [Elements.get_element(_a.symbol)["single"] for _a in _atoms]
     npcov = [_v if _v is not None else np.nan for _v in npcov]
@@ -230,7 +230,11 @@ def embed_symm(_c: Mol):
         for _ps in pairs_list:
             logger.debug(
                 "{}: {}: root {} and {}: map {}".format(
-                    _c.name, _a, _ps["ref_root"], _ps["tar_root"], [[str(k) for k in i] for i in _ps["pair_list"]],
+                    _c.name,
+                    _a,
+                    _ps["ref_root"],
+                    _ps["tar_root"],
+                    [[str(k) for k in i] for i in _ps["pair_list"]],
                 )
             )
 
@@ -390,7 +394,11 @@ def rmsd_pruning(
         return min_rmsd, min_rot_mat
 
     def cal_sym_rmsd(
-        ref_conf: Mol, tar_conf: Mol, all_perturbation: bool, max_cycle: int, numisomer_swap: bool,
+        ref_conf: Mol,
+        tar_conf: Mol,
+        all_perturbation: bool,
+        max_cycle: int,
+        numisomer_swap: bool,
     ):
         np_ref_xyzs = np.array([_a.xyz for _a in ref_conf.atoms])
         np_tar_xyzs = np.array([_a.xyz for _a in tar_conf.atoms])
@@ -421,7 +429,12 @@ def rmsd_pruning(
                         # logger.debug('rot_mat was {}'.format(_rot_mat.astype(int).tolist()))
         else:
             min_rmsd, min_rot_mat = cyclic_rmsd(
-                min_rmsd, max_cycle, _rotamers, np.identity(xyz_length), np_ref_xyzs, np_tar_xyzs,
+                min_rmsd,
+                max_cycle,
+                _rotamers,
+                np.identity(xyz_length),
+                np_ref_xyzs,
+                np_tar_xyzs,
             )
         if numisomer_swap:
             tar_conf_numisomers: List[Matrix] = tar_conf.data["numisomer"]
@@ -559,7 +572,10 @@ def map_numbers(confs: Mols, reference_confs: Mols):
 
     def _det_ez(subs: List[int], test_atoms: Atoms):
         _dihed = _get_dihedral(
-            test_atoms.get(subs[0]), test_atoms.get(subs[1]), test_atoms.get(subs[2]), test_atoms.get(subs[3]),
+            test_atoms.get(subs[0]),
+            test_atoms.get(subs[1]),
+            test_atoms.get(subs[2]),
+            test_atoms.get(subs[3]),
         )
         if _dihed > 90 or _dihed < -90:
             _ret = True

@@ -19,7 +19,10 @@ def replace_key(conf: Mol, lines: List[str]):
         if "#AXYZ#" in _rls:
             _xyz = [
                 "{:<2} {:>15} {:>15} {:>15}".format(
-                    _a.symbol, float_to_str(_a.x), float_to_str(_a.y), float_to_str(_a.z),
+                    _a.symbol,
+                    float_to_str(_a.x),
+                    float_to_str(_a.y),
+                    float_to_str(_a.z),
                 )
                 for _a in conf.atoms
             ]

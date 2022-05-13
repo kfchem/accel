@@ -20,7 +20,7 @@ def edit_bond_length(
     _vect = [0.0, 0.0, 0.0]
     for i in range(3):
         _vect[i] = _c.atoms.get(atom_b).xyz[i] - _c.atoms.get(atom_a).xyz[i]
-    _dist = math.sqrt(sum(x ** 2 for x in _vect))
+    _dist = math.sqrt(sum(x**2 for x in _vect))
 
     def move_atoms(atoms_list, vect_factor):
         for atom_no in atoms_list:
@@ -64,10 +64,13 @@ def calc_length(_c: Mol, atom_index_a: int, atom_index_b: int, key: str = ""):
     _a = _c.atoms.get(atom_index_a).xyz
     _b = _c.atoms.get(atom_index_b).xyz
     _d = [float(_a[i]) - float(_b[i]) for i in range(3)]
-    _dist = math.sqrt(sum(x ** 2 for x in _d))
+    _dist = math.sqrt(sum(x**2 for x in _d))
     if key == "" or not isinstance(key, str):
         key = "distance_{}{}-{}{}".format(
-            _c.atoms.get(atom_index_a).symbol, str(atom_index_a), _c.atoms.get(atom_index_b).symbol, str(atom_index_b),
+            _c.atoms.get(atom_index_a).symbol,
+            str(atom_index_a),
+            _c.atoms.get(atom_index_b).symbol,
+            str(atom_index_b),
         )
     _c.data[key] = _dist
 
@@ -92,7 +95,12 @@ def get_dihedral(atom_a: Atom, atom_b: Atom, atom_c: Atom, atom_d: Atom) -> floa
 
 
 def calc_dihedral(
-    _c: Mol, atom_index_a: int, atom_index_b: int, atom_index_c: int, atom_index_d: int, key: str = "",
+    _c: Mol,
+    atom_index_a: int,
+    atom_index_b: int,
+    atom_index_c: int,
+    atom_index_d: int,
+    key: str = "",
 ):
     if key == "" or not isinstance(key, str):
         key = "dihedral_{}{}-{}{}-{}{}-{}{}".format(
@@ -106,7 +114,10 @@ def calc_dihedral(
             str(atom_index_d),
         )
     _c.data[key] = get_dihedral(
-        _c.atoms.get(atom_index_a), _c.atoms.get(atom_index_b), _c.atoms.get(atom_index_c), _c.atoms.get(atom_index_d),
+        _c.atoms.get(atom_index_a),
+        _c.atoms.get(atom_index_b),
+        _c.atoms.get(atom_index_c),
+        _c.atoms.get(atom_index_d),
     )
 
 
@@ -124,7 +135,11 @@ def get_angle(atom_a: Atom, atom_b: Atom, atom_c: Atom) -> float:
 
 
 def calc_angle(
-    _c: Mol, atom_index_a: int, atom_index_b: int, atom_index_c: int, key: str = "",
+    _c: Mol,
+    atom_index_a: int,
+    atom_index_b: int,
+    atom_index_c: int,
+    key: str = "",
 ):
     if key == "" or not isinstance(key, str):
         key = "angle_{}{}-{}{}-{}{}".format(
@@ -135,7 +150,11 @@ def calc_angle(
             _c.atoms.get(atom_index_c).symbol,
             str(atom_index_c),
         )
-    _c.data[key] = get_angle(_c.atoms.get(atom_index_a), _c.atoms.get(atom_index_b), _c.atoms.get(atom_index_c),)
+    _c.data[key] = get_angle(
+        _c.atoms.get(atom_index_a),
+        _c.atoms.get(atom_index_b),
+        _c.atoms.get(atom_index_c),
+    )
 
 
 def convert_to_mirror(_c: Mol, centering=True):

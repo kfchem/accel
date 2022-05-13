@@ -7,7 +7,7 @@ from accel.base.tools import change_dir
 from accel.util.log import logger
 
 
-def line_formatter(new_line):
+def _line_formatter(new_line):
     if isinstance(new_line, str):
         ret_lines = [str(_l) + "\n" for _l in new_line.split("\n")]
     else:
@@ -51,21 +51,21 @@ class TxtBox(BoxCore):
         return self
 
     def insert_lines(self, number: int, new_lines=""):
-        new_lines = line_formatter(new_lines)
+        new_lines = _line_formatter(new_lines)
         for _c in self.pack():
             _ls: List[str] = _c.data["txt"]
             _ls = _ls[: number - 1] + new_lines + _ls[number - 2 :]
         return self
 
     def append_lines(self, new_lines=""):
-        new_lines = line_formatter(new_lines)
+        new_lines = _line_formatter(new_lines)
         for _c in self.pack():
             _ls: List[str] = _c.data["txt"]
             _ls.extend(new_lines)
         return self
 
     def replace_lines(self, number: int, new_lines=""):
-        new_lines = line_formatter(new_lines)
+        new_lines = _line_formatter(new_lines)
         for _c in self.pack():
             _ls: List[str] = _c.data["txt"]
             _ls[number - 1] = "".join(new_lines)

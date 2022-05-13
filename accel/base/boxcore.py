@@ -311,9 +311,9 @@ class BoxCore:
         logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
         return self
 
-    def write_xyz(self, directory: Path = None, change_path: bool = False, centering: bool = True):
+    def write_xyz(self, directory: Path = None, link: bool = True, centering: bool = True):
         for _c in self.pack():
-            formats.write_xyz(_c, directory, change_path, centering)
+            formats.write_xyz(_c, directory, link, centering)
         Log.set_output_dir(directory)
         logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
         return self
@@ -325,18 +325,18 @@ class BoxCore:
         logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
         return self
 
-    def write_mol(self, directory: Path = None, change_path: bool = False, centering: bool = True):
+    def write_mol(self, directory: Path = None, link: bool = True, centering: bool = True):
         if len(self.pack()) != len(self.pack().has_bonds()):
             self.calc_bonds()
         for _c in self.pack():
-            formats.write_mol(_c, directory, change_path, centering)
+            formats.write_mol(_c, directory, link, centering)
         Log.set_output_dir(directory)
         logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
         return self
 
-    def write_input(self, template: Path, directory=None, change_path: bool = False):
+    def write_input(self, template: Path, directory=None, link: bool = True, arg: Dict[str, str] = None):
         for _c in self.pack():
-            text.write_input(_c, template, directory, change_path)
+            text.write_input(_c, template, directory, link)
         Log.set_output_dir(directory)
         logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
         return self
@@ -395,7 +395,11 @@ class BoxCore:
             logger.info("embed_symm called automatically")
             self.calc_symm()
         topology.rmsd_pruning(
-            self.pack(), threshold, all_combinations_of_confs, redundant_check, all_perturbation_of_rotamers,
+            self.pack(),
+            threshold,
+            all_combinations_of_confs,
+            redundant_check,
+            all_perturbation_of_rotamers,
         )
         logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
         return self

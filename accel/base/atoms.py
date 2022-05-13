@@ -60,7 +60,7 @@ class Atom:
 
     def __str__(self):
         if self._atoms is None:
-            return f"{self.symbol} at ({self.x}, {self.y}, {self.z})"
+            return f"{self.symbol}({self.x}, {self.y}, {self.z})"
         else:
             return f"{self.number}{self.symbol}"
 
@@ -739,7 +739,10 @@ class Atoms(MutableSequence):
         return self
 
     def get_maps(
-        self, target: "Atoms", known_pairs: List[Tuple[int]] = [], terminal_first: bool = False,
+        self,
+        target: "Atoms",
+        known_pairs: List[Tuple[int]] = [],
+        terminal_first: bool = False,
     ) -> List[List[int]]:
         atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self, atoms_map)
@@ -760,7 +763,10 @@ class Atoms(MutableSequence):
         return return_chains
 
     def get_mapped(
-        self, target: "Atoms", known_pairs: List[Tuple[int]] = [], terminal_first: bool = False,
+        self,
+        target: "Atoms",
+        known_pairs: List[Tuple[int]] = [],
+        terminal_first: bool = False,
     ) -> List["Atoms"]:
         atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self, atoms_map)
