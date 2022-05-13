@@ -11,7 +11,7 @@ with Path("accel").joinpath("__init__.py").open("r") as f:
 setup(
     name="accel",
     version=_version,
-    description="automated computational chemistry library specialized for handling large numbers of conformational isomers",
+    description="automated computation chemical library specialized for handling large numbers of conformers",
     long_description=readme,
     author="Keisuke Fukaya",
     author_email="kfukaya@pu-toyama.ac.jp",
