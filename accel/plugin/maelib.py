@@ -203,7 +203,7 @@ class MaeBox(BoxCore):
         logger.debug(f"done: {str(self)}")
         return self
 
-    def pack_unzip(self, zero_fill_digit=3, max_loading=999):
+    def get_unzip(self, zero_fill_digit=3, max_loading=999):
         boxls = []
         for _maegz in self.mols:
             logger.info(f"reading {_maegz.name}")

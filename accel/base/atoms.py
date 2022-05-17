@@ -147,7 +147,7 @@ class Atom:
         self.z = self.z + float(vector[0])
         return self
 
-    def duplicate(self, parent_atoms=None):
+    def duplicate(self, parent_atoms=None) -> "Atom":
         _n = Atom(parent_atoms)
         _n._symbol = self._symbol
         _n.x = self.x
@@ -176,6 +176,7 @@ class Atom:
             data_dict[f"Data[{_key}]"] = _val
         for _key, _val in data_dict.items():
             logger.info(f"{str(self)}: {_key}: {str(_val)}")
+        return self
 
 
 class Bonds(MutableMapping):
@@ -258,6 +259,7 @@ class Bonds(MutableMapping):
     def show(self):
         for _b, _type in self.to_dict().items():
             logger.info(f"{_b[0]:>3} -{_b[1]:>3}: {BondType.decode(_type)}")
+        return self
 
 
 def _get_maps(
@@ -690,7 +692,7 @@ class Atoms(MutableSequence):
         for _a in self._list:
             _a.charge = ref_atoms.get(_a.number).charge
 
-    def duplicate(self):
+    def duplicate(self) -> "Atoms":
         _n = Atoms()
         _n._list = [_a.duplicate(_n) for _a in self._list]
         if self.bonds is not None:
@@ -706,6 +708,7 @@ class Atoms(MutableSequence):
 
     def init_bonds(self):
         self.bonds = Bonds(len(self._list))
+        return self
 
     def add_bond(self, number_a: int, number_b: int, bond_type: int):
         if self.bonds is None:
@@ -733,6 +736,7 @@ class Atoms(MutableSequence):
     def show(self):
         for _a in self._list:
             logger.info(f"{str(_a):>4}: {_a.x:>8.4f}: {_a.y:>7.4f}: {_a.z:>7.4f}")
+        return self
 
     def bind(self, value: List):
         self._list = value

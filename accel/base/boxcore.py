@@ -8,6 +8,7 @@ from accel.base import formats as formats
 from accel.base import text as text
 from accel.base import topology as topology
 from accel.base import xyz as xyz
+from accel.base.box import Box
 from accel.base.mols import Mol, Mols
 from accel.base.selector import Selectors
 from accel.base.tools import change_dir
@@ -125,7 +126,7 @@ class BoxCore:
         logger.info(_l)
         return self
 
-    def get_duplicate(self):
+    def duplicate(self) -> "Box":
         _n = self.__class__()
         _n._mols = self._mols.duplicate(_n)
         _n.data = self.data.duplicate(_n)
@@ -403,7 +404,7 @@ class BoxCore:
     def map_numbers(self, reference_box: "BoxCore" = None):
         if reference_box is None:
             reference_box = BoxCore([_confs.get() for _confs in self.mols.labels.values()])
-        r_mulcos = reference_box.get_duplicate()
+        r_mulcos = reference_box.duplicate()
         r_mulcos.calc_bonds()
         r_mulcos.calc_symm()
         topology.map_numbers(self.mols, r_mulcos._mols)
@@ -437,7 +438,7 @@ class BoxCore:
         logger.debug(f"done: {str(self)}")
         return self
 
-    def pack_average(self, keys: List[str] = [], keys_for_atoms: List[str] = []) -> Mols:
+    def get_average(self, keys: List[str] = [], keys_for_atoms: List[str] = []) -> Mols:
         new_ls: List[Mol] = []
         if len(self.mols) != len(self.mols.has_data("distribution")):
             logger.info("all of active conformers do not have distribution data")

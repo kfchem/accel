@@ -113,6 +113,7 @@ class Mol:
         self._initialized = False
         self.flag = False
         self._initialized = True
+        return self
 
     def show(self):
         data_dict = {}
@@ -139,6 +140,7 @@ class Mol:
             data_dict[f"Data[{_key}]"] = _val
         for _key, _val in data_dict.items():
             logger.info(f"{self.name}: {_key}: {str(_val)}")
+        return self
 
     def duplicate(self) -> "Mol":
         _n = Mol()
@@ -230,7 +232,7 @@ class Mols(MutableSequence):
             self._list = list(data_list)
         return self
 
-    def duplicate(self, parent_obj=None):
+    def duplicate(self, parent_obj=None) -> "Mols":
         _n = Mols()
         _n._list = [_c.duplicate() for _c in self._list]
         return _n
@@ -324,7 +326,7 @@ class Mols(MutableSequence):
                 return None
         return None
 
-    def sorted(self, key="energy"):
+    def sorted(self, key="energy") -> "Mols":
         if key == "energy":
             new_list = sorted(self._list, key=lambda _c: _c.energy)
         elif key == "name":
