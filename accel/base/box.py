@@ -11,18 +11,18 @@ from accel.util.log import logger
 def adaptive_function_caller(box: "Box", selector: FuncSelector, filetype, **options):
     if filetype is not None:
         try:
-            selector(filetype, Box().bind(box.pack()), **options)
+            selector(filetype, Box().bind(box.mols), **options)
         except ValueError:
-            for _c in box.pack():
+            for _c in box.mols:
                 _c.deactivate("could not find an appropriate function")
     else:
-        for ft, confs in box.pack().filetypes.items():
+        for ft, confs in box.mols.filetypes.items():
             try:
                 selector(ft, Box().bind(confs), **options)
             except ValueError:
                 for _c in confs:
                     _c.deactivate("could not find an appropriate function")
-    logger.debug(f"done: {len(box.pack())}/{len(box._mols)} confomers")
+    logger.debug(f"done: {str(box)}")
 
 
 class Box(BoxCore):

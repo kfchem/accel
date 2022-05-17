@@ -24,7 +24,7 @@ def que_submit(_c: Mol):
 def que_wait(mulcos: BoxCore, interval_time=10):
     logger.info("qsub: waiting completion of tasks")
     _jid_list = []
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         _jid_list.append(_c.data["jobid"])
     while len(_jid_list) != 0:
         time.sleep(interval_time)
@@ -53,20 +53,20 @@ def is_pbs_jobscript(_p: Path) -> bool:
 class PbsBox(BoxCore):
     @Selectors.submit.add("app/pbs/jobscript")
     def submit(self):
-        for _c in self.pack():
+        for _c in self.mols:
             que_submit(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def wait(self, interval_time=10):
         que_wait(self, interval_time)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.run.add("app/pbs/jobscript")
     def run(self):
-        for _c in self.pack():
+        for _c in self.mols:
             que_submit(_c)
         que_wait(self)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self

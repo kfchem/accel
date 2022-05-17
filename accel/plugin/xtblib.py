@@ -7,7 +7,7 @@ from accel.util.log import logger
 
 
 def read_total_free_energy(mulcos: BoxCore):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         with _c.path.open(encoding="utf-8") as f:
             _ls = f.readlines()
         _n = 0
@@ -38,7 +38,7 @@ def is_xtb_output(_p: Path) -> bool:
 class XtbBox(BoxCore):
     @Selectors.check_end.add("app/xtb/output")
     def check_end(self):
-        for _c in self.pack():
+        for _c in self.mols:
             with _c.path.open(encoding="utf-8") as f:
                 _ls = f.readlines()
             _flag = False
@@ -50,12 +50,12 @@ class XtbBox(BoxCore):
             else:
                 logger.info(f"xTB: {_c.path.name} was NOT terminated normally")
                 _c.deactivate("check_end")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_energy.add("app/xtb/output")
     def read_energy(self):
-        for _c in self.pack():
+        for _c in self.mols:
             with _c.path.open(encoding="utf-8") as f:
                 _ls = f.readlines()
             _n = 0
@@ -68,10 +68,10 @@ class XtbBox(BoxCore):
             else:
                 logger.error(f"xTB: {_c.path.name}: the energy entry was not found")
                 _c.deactivate("read_energy: xtb")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def read_free_energy(self):
         read_total_free_energy(self)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self

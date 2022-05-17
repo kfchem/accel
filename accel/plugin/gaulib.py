@@ -19,7 +19,7 @@ def read_multiple_xyz(mulcos: BoxCore):
 
 
 def calc_sum_energy(mulcos: BoxCore):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         _c.data["g16_t_zero"] = _c.data["g16_zpc"] + _c.data["g16_scf"]
         _c.data["g16_t_energy"] = _c.data["g16_corr_to_energy"] + _c.data["g16_scf"]
         _c.data["g16_t_enthalpy"] = _c.data["g16_corr_to_enthalpy"] + _c.data["g16_scf"]
@@ -28,7 +28,7 @@ def calc_sum_energy(mulcos: BoxCore):
 
 
 def read_low_freqs(mulcos: BoxCore):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         with _c.path.open() as f:
             _ls = f.readlines()
         for i, _l in enumerate(_ls):
@@ -40,7 +40,7 @@ def read_low_freqs(mulcos: BoxCore):
 
 
 def read_vibration(mulcos: BoxCore, freq_number: int = 1):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         _freq = []
         with _c.path.open() as f:
             _ls = f.readlines()
@@ -66,7 +66,7 @@ def check_bonding(
     additional_valid_range: int = 0,
     acceptable_invalid_atoms: int = 0,
 ):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         _dists = []
         for i, _v in enumerate(_c.data["g16_vibration"]):
             _dists.append([i + 1, np.linalg.norm(np.array(_v))])
@@ -88,7 +88,7 @@ def check_bonding(
 
 
 def read_nmr(mulcos: BoxCore):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         with _c.path.open() as f:
             _ls = f.readlines()
         for i, _l in enumerate(_ls):
@@ -104,7 +104,7 @@ def read_nmr(mulcos: BoxCore):
 
 
 def read_ecd(mulcos: BoxCore):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         with _c.path.open() as f:
             _ls = f.readlines()
         _stat_dict = defaultdict(dict)
@@ -158,7 +158,7 @@ def read_spinspin(mulcos: BoxCore, key_value: str = "Total_J"):
     }
     _key_str = _key_list[key_value]
     logger.info(f"{_key_str[:-1]} is used for extracting coupling data")
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         with _c.path.open() as f:
             _ls = f.readlines()
         for i, _l in enumerate(_ls):
@@ -262,7 +262,7 @@ def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
         Gerr("FormBX problem", statement="FormBX had a problem"),
     ]
 
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         _c.data["resubmission"] = False
         with _c.path.with_suffix(input_suffix).open("r") as f:
             gjf_ls = f.readlines()
@@ -327,7 +327,7 @@ def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
                 unknown_err.resolve(_c)
                 logger.error(f"{_c.name}: unknown termination was detected")
 
-    if len(mulcos.pack().has_data("resubmission", True)) == 0:
+    if len(mulcos.mols.has_data("resubmission", True)) == 0:
         logger.info("There is no resubmission")
 
 
@@ -394,7 +394,7 @@ class GauBox(BoxCore):
         """
         source = 'archive' | 'standard_orientation' | 'input_orientation'
         """
-        for _c in self.pack():
+        for _c in self.mols:
             with _c.path.open() as f:
                 _ls = f.readlines()
 
@@ -445,12 +445,12 @@ class GauBox(BoxCore):
             for _l in _axyz:
                 _c.atoms.append(_l)
             logger.debug(f"read xyz of {_c.path.name} from {source}")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_atoms.add("app/g16/input")
     def read_atoms_from_input(self):
-        for _c in self.pack():
+        for _c in self.mols:
             with _c.path.open() as f:
                 _ls = f.readlines()
             blank_line_count = 0
@@ -481,12 +481,12 @@ class GauBox(BoxCore):
                 continue
             else:
                 logger.debug(f"read atoms of {_c.path.name}")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_energy.add("app/g16/output")
     def read_scf(self, calculation_method: str = None):
-        for _c in self.pack():
+        for _c in self.mols:
             if calculation_method is None:
                 scf_key = "SCF Done:"
             else:
@@ -504,12 +504,12 @@ class GauBox(BoxCore):
                 continue
             _c.data["g16_scf"] = float(_ls[_n].split()[4])
             _c.energy = Units.hartree(_c.data["g16_scf"]).to_kcal_mol
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_correction.add("app/g16/output")
     def read_correction(self):
-        for _c in self.pack():
+        for _c in self.mols:
             with _c.path.open() as f:
                 _ls = f.readlines()
             for i, _l in enumerate(_ls):
@@ -521,12 +521,12 @@ class GauBox(BoxCore):
                     _c.data["g16_corr_to_enthalpy"] = float(_ls[i].split()[4])
                 if "Thermal correction to Gibbs Free Energy" in _l:
                     _c.data["g16_corr_to_gibbs"] = float(_ls[i].split()[6])
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.check_end.add("app/g16/output")
     def check_end(self, input_suffix: str = ".gjf"):
-        for _c in self.pack():
+        for _c in self.mols:
             if _c.path.with_suffix(input_suffix).exists():
                 with _c.path.with_suffix(input_suffix).open("r") as f:
                     _gjf_ls = f.readlines()
@@ -557,12 +557,12 @@ class GauBox(BoxCore):
                 else:
                     logger.info(f"{_c.path.name} was NOT terminated normally")
                     _c.deactivate("check_end")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.check_freq.add("app/g16/output")
     def check_freq(self, im: int = 0):
-        for _c in self.pack():
+        for _c in self.mols:
             _freq = []
             with _c.path.open() as f:
                 _ls = f.readlines()
@@ -577,42 +577,42 @@ class GauBox(BoxCore):
                         _c.deactivate("check_freq")
             if _freq == []:
                 logger.error(f"could not find frequency in {_c.path.name}")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def read_vibration(self, freq_number: int = 1):
         read_vibration(self, freq_number)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def check_bonding(
         self, bonding_atoms: List[int], additional_valid_range: int = 0, acceptable_invalid_atoms: int = 0
     ):
-        if len(self.pack()) != len(self.pack().has_data("g16_vibration")):
+        if len(self.mols) != len(self.mols.has_data("g16_vibration")):
             logger.info("read_vibration called automatically")
             self.read_vibration()
         check_bonding(self, bonding_atoms, additional_valid_range, acceptable_invalid_atoms)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def read_nmr(self):
         read_nmr(self)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def read_ecd(self):
         read_ecd(self)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def read_coupling(self, key_value: str = "Total_J"):
         read_spinspin(self, key_value)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def check_resub(self, input_suffix=".gjf", output_suffix=".log"):
         check_resub(self, input_suffix, output_suffix)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.calc_free_energy.add("app/g16/output")
@@ -620,29 +620,29 @@ class GauBox(BoxCore):
         return self.calc_energy(keys=keys, unit=unit)
 
     def is_input(self):
-        for _c in self.pack():
+        for _c in self.mols:
             if not is_g16_input(_c.path):
                 _c.flag = False
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def is_output(self):
-        for _c in self.pack():
+        for _c in self.mols:
             if not is_g16_output(_c.path):
                 _c.flag = False
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.run.add("app/g16/input")
     def run(self):
-        for _c in self.pack():
+        for _c in self.mols:
             run(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.submit.add("app/g16/input")
     def submit(self):
-        for _c in self.pack():
+        for _c in self.mols:
             submit(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self

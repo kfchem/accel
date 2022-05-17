@@ -173,13 +173,13 @@ def read_potential_energy_from_mae(_c: Mol):
 class MaeBox(BoxCore):
     @Selectors.read_atoms.add("format/mae")
     def read_mae(self):
-        for _c in self.pack():
+        for _c in self.mols:
             read_mae(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def read_maegz(self):
-        for _c in self.pack():
+        for _c in self.mols:
             with gzip.open(_c.path, mode="rt") as f:
                 ls = f.readlines()
             try:
@@ -193,19 +193,19 @@ class MaeBox(BoxCore):
             _c.atoms.clear()
             _embed_f_m_ct(_c, f_m_ct)
             logger.debug(f"read data coordinates and bonds from {_c.path.name}")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_energy.add("format/mae")
     def read_energy(self):
-        for _c in self.pack():
+        for _c in self.mols:
             read_potential_energy_from_mae(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def pack_unzip(self, zero_fill_digit=3, max_loading=999):
         boxls = []
-        for _maegz in self.pack():
+        for _maegz in self.mols:
             logger.info(f"reading {_maegz.name}")
             with gzip.open(_maegz.path, mode="rt") as f:
                 ls = f.readlines()
@@ -228,7 +228,7 @@ class MaeBox(BoxCore):
                 boxls.append(new_c)
                 logger.info(f"read {new_c.name}")
         ret_box = Mols().bind(boxls)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return ret_box
 
     def write_mae(self, directory: Path = None):
@@ -242,7 +242,7 @@ class MaeBox(BoxCore):
         elif platform.system() == "Mac":
             pass
         with tempfile.TemporaryDirectory() as tmp_dir:
-            for _c in self.pack():
+            for _c in self.mols:
                 mol_path = write_mol(_c, output_dir=tmp_dir, centering=False)
                 _p = change_dir(_c.path, directory, _c.name).with_suffix(".mae")
                 _txt = [
@@ -258,22 +258,22 @@ class MaeBox(BoxCore):
                 else:
                     logger.info(f"successfully converted to {_p}")
 
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def calc_energy(self, keys: List[str] = ["mmod_Potential_Energy-S-OPLS"], unit: Unit = Units.kJ_mol):
         return super().calc_energy(keys=keys, unit=unit)
 
     def is_mae_format(self):
-        for _c in self.pack():
+        for _c in self.mols:
             if not is_mae_format(_c.path):
                 _c.flag = False
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def is_maegz_format(self):
-        for _c in self.pack():
+        for _c in self.mols:
             if not is_maegz_format(_c.path):
                 _c.flag = False
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self

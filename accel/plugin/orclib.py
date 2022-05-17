@@ -9,7 +9,7 @@ from accel.util.log import logger
 
 
 def check_optimized(mulcos: BoxCore):
-    for _c in mulcos.pack():
+    for _c in mulcos.mols:
         with _c.path.open() as f:
             _ls = f.readlines()
         _flag = False
@@ -116,7 +116,7 @@ def submit(_c: Mol):
 class OrcBox(BoxCore):
     @Selectors.check_end.add("app/orca/output")
     def check_end(self):
-        for _c in self.pack():
+        for _c in self.mols:
             with _c.path.open() as f:
                 _ls = f.readlines()
             _flag = False
@@ -128,52 +128,52 @@ class OrcBox(BoxCore):
             else:
                 logger.info(f"ORCA: {_c.path.name} was NOT terminated normally")
                 _c.deactivate("check_end")
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def check_optimized(self):
         check_optimized(self)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_energy.add("app/orca/output")
     def read_energy(self):
-        for _c in self.pack():
+        for _c in self.mols:
             read_energy(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_atoms.add("app/orca/output")
     def read_atoms_from_xyz(self):
-        for _c in self.pack():
+        for _c in self.mols:
             read_atoms_from_xyz(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def is_input(self):
-        for _c in self.pack():
+        for _c in self.mols:
             if not is_orca_input(_c.path):
                 _c.flag = False
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     def is_output(self):
-        for _c in self.pack():
+        for _c in self.mols:
             if not is_orca_output(_c.path):
                 _c.flag = False
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.run.add("app/orca/input")
     def run(self):
-        for _c in self.pack():
+        for _c in self.mols:
             run(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.submit.add("app/orca/input")
     def submit(self):
-        for _c in self.pack():
+        for _c in self.mols:
             submit(_c)
-        logger.debug(f"done: {len(self.pack())}/{len(self.mols)} confomers")
+        logger.debug(f"done: {str(self)}")
         return self
