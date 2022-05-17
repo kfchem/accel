@@ -8,7 +8,6 @@ from accel.base import formats as formats
 from accel.base import text as text
 from accel.base import topology as topology
 from accel.base import xyz as xyz
-from accel.base.box import Box
 from accel.base.mols import Mol, Mols
 from accel.base.selector import Selectors
 from accel.base.tools import change_dir
@@ -126,7 +125,7 @@ class BoxCore:
         logger.info(_l)
         return self
 
-    def duplicate(self) -> "Box":
+    def duplicate(self):
         _n = self.__class__()
         _n._mols = self._mols.duplicate(_n)
         _n.data = self.data.duplicate(_n)
