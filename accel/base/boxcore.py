@@ -48,6 +48,10 @@ class BoxCore:
     def mols(self) -> Mols:
         return self._mols.has_state(True)
 
+    @property
+    def allmols(self) -> Mols:
+        return self._mols.has_state(None)
+
     def __len__(self) -> int:
         return len(self._mols)
 
