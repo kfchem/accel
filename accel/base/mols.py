@@ -17,7 +17,7 @@ class Mol:
         "filetype",
         "label",
         "flag",
-        "defect",
+        "history",
         "energy",
         "atoms",
         "data",
@@ -38,7 +38,7 @@ class Mol:
             self.filetype = FileType.analyse(self.path)
         self.label: str = ""
         self.flag: bool = True
-        self.defect: str = ""
+        self.history: str = ""
         self.energy: float = None
         self.atoms: Atoms = Atoms()
         self.data: Data = Data(self)
@@ -104,12 +104,12 @@ class Mol:
     def charge_setter(self, value):
         self.total_charge = value
 
-    def deactivate(self, cause: str = ""):
-        logger.info(f"{self.name}: {cause}")
-        if self.defect == "":
-            self.defect = cause
+    def deactivate(self, reason: str = ""):
+        logger.info(f"{self.name}: {reason}")
+        if self.history == "":
+            self.history = reason
         else:
-            self.defect += f"; {cause}"
+            self.history += f"; {reason}"
         self._initialized = False
         self.flag = False
         self._initialized = True
@@ -128,7 +128,7 @@ class Mol:
             data_dict["State"] = "ACTIVE"
         else:
             data_dict["State"] = "INACTIVE"
-        data_dict["Defect"] = self.defect
+        data_dict["History"] = self.history
         data_dict["Label"] = self.label
         if self.energy is None:
             data_dict["Energy"] = "----- kcal/mol"

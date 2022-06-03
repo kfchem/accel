@@ -142,7 +142,7 @@ class BoxCore:
             "path",
             "filetype",
             "state",
-            "defect",
+            "history",
             "label",
             "energy",
             "charge",
@@ -154,7 +154,7 @@ class BoxCore:
             data_dict["path"] = _c.path
             data_dict["filetype"] = _c.filetype
             data_dict["state"] = _c.flag
-            data_dict["defect"] = _c.defect
+            data_dict["history"] = _c.history
             data_dict["label"] = _c.label
             data_dict["energy"] = _c.energy
             data_dict["charge"] = _c.charge
