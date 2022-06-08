@@ -24,6 +24,7 @@ class Mol:
         "cache",
         "total_charge",
         "multiplicity",
+        "distribution",
         "_initialized",
     ]
 
@@ -45,6 +46,7 @@ class Mol:
         self.cache: Dict = {}
         self.total_charge: int = None
         self.multiplicity: int = 1
+        self.distribution: float = None
         self._initialized = True
 
         if self.path is not None and not self.path.exists():
@@ -72,7 +74,9 @@ class Mol:
                     logger.error(f"{value} does not exist")
                 else:
                     self.filetype = FileType.analyse(value)
-                logger.debug(f"{self}: set: {str(value)}")
+                logger.debug(f"{self}: path: {str(value)}")
+            else:
+                logger.debug(f"{self}: path: {value}")
         elif key == "name":
             value = str(value)
             logger.debug(f"{self}: name: {value}")
@@ -83,14 +87,20 @@ class Mol:
             value = str(value)
             logger.debug(f"{self}: label: {value}")
         elif key == "energy":
-            value = float(value)
+            if value is not None:
+                value = float(value)
             logger.debug(f"{self}: energy: {value}")
         elif key == "total_charge":
-            value = int(value)
+            if value is not None:
+                value = int(value)
             logger.debug(f"{self}: total_charge: {value}")
         elif key == "multiplicity":
             value = int(value)
             logger.debug(f"{self}: multiplicity: {value}")
+        elif key == "distribution":
+            if value is not None:
+                value = float(value)
+            logger.debug(f"{self}: distribution: {value}")
         object.__setattr__(self, key, value)
 
     @property
@@ -294,6 +304,23 @@ class Mols(MutableSequence):
             if _cs is None:
                 return Mols()
             return _cs
+
+    def has_distribution(self, min_limit: float = None, max_limit: float = None) -> "Mols":
+        _cs = [_c for _c in self._list if _c.distribution is not None]
+        if min_limit is None and max_limit is None:
+            return Mols().bind(_cs)
+        if len(_cs) == 0:
+            return Mols().bind(_cs)
+        if min_limit is None:
+            min_limit = min(_c.distribution for _c in _cs)
+        else:
+            min_limit = float(min_limit)
+        if max_limit is None:
+            max_limit = max(_c.distribution for _c in _cs)
+        else:
+            max_limit = float(max_limit)
+        _cs = [_c for _c in _cs if min_limit <= _c.distribution and _c.distribution <= max_limit]
+        return Mols().bind(_cs)
 
     def has_data(self, key: str, value=None) -> "Mols":
         if value is None:

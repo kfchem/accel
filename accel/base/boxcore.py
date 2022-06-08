@@ -249,7 +249,7 @@ class BoxCore:
                 )
                 sum_bfac += _c.cache["distr_factor"]
             for _c in confs:
-                _c.data["distribution"] = _c.cache["distr_factor"] / sum_bfac
+                _c.distribution = _c.cache["distr_factor"] / sum_bfac
 
         if in_label:
             if len(self.mols) != len(self.mols.has_label()):
@@ -443,7 +443,7 @@ class BoxCore:
 
     def get_average(self, keys: List[str] = [], keys_for_atoms: List[str] = []) -> Mols:
         new_ls: List[Mol] = []
-        if len(self.mols) != len(self.mols.has_data("distribution")):
+        if len(self.mols) != len(self.mols.has_distribution()):
             logger.info("all of active conformers do not have distribution data")
             logger.info("calc_distr called automatically")
             self.calc_distribution()
@@ -470,7 +470,7 @@ class BoxCore:
                 continue
             for _c in new_ls:
                 for _oc in self.mols.labels.get(_c.name):
-                    _c.data[_key] += _oc.data[_key] * _oc.data["distribution"]
+                    _c.data[_key] += _oc.data[_key] * _oc.distribution
         for _key in keys_for_atoms:
             for _c in new_ls:
                 for _a in _c.atoms:
@@ -480,7 +480,7 @@ class BoxCore:
                         if tmp_val is None:
                             logger.error(f"atom {_oc.atoms.get(_a.number)} of {_oc} have no {_key} data")
                             break
-                        sum_val += float(tmp_val) * _oc.data["distribution"]
+                        sum_val += float(tmp_val) * _oc.distribution
                     else:
                         _a.data[_key] = sum_val
         return Mols().bind(new_ls)
