@@ -50,8 +50,8 @@ class Box(BoxCore):
         adaptive_function_caller(self, Selectors.read_energy, filetype, **options)
         return self
 
-    def read_correction(self, filetype=None, **options):
-        adaptive_function_caller(self, Selectors.read_correction, filetype, **options)
+    def read_thermal(self, filetype=None, **options):
+        adaptive_function_caller(self, Selectors.read_thermal, filetype, **options)
         return self
 
     def check_freq(self, filetype=None, **options):

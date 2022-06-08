@@ -6,7 +6,7 @@ from typing import List
 
 import numpy as np
 from accel.base.boxcore import BoxCore
-from accel.base.mols import Mol
+from accel.base.mols import Mol, Mols
 from accel.base.selector import Selectors
 from accel.util import Execmd, FileType
 from accel.util.constants import Elements, Unit, Units
@@ -103,8 +103,8 @@ def read_nmr(mulcos: BoxCore):
                     _a.data["anisotropy"] = float(_l.split()[7])
 
 
-def read_ecd(mulcos: BoxCore):
-    for _c in mulcos.mols:
+def read_ecd(box: BoxCore):
+    for _c in box.mols:
         with _c.path.open() as f:
             _ls = f.readlines()
         _stat_dict = defaultdict(dict)
@@ -507,8 +507,8 @@ class GauBox(BoxCore):
         logger.debug(f"done: {str(self)}")
         return self
 
-    @Selectors.read_correction.add("app/g16/output")
-    def read_correction(self):
+    @Selectors.read_thermal.add("app/g16/output")
+    def read_thermal(self):
         for _c in self.mols:
             with _c.path.open() as f:
                 _ls = f.readlines()
@@ -614,6 +614,11 @@ class GauBox(BoxCore):
         check_resub(self, input_suffix, output_suffix)
         logger.debug(f"done: {str(self)}")
         return self
+
+    def get_resub(self, input_suffix=".gjf", output_suffix=".log") -> Mols:
+        check_resub(self, input_suffix, output_suffix)
+        logger.debug(f"done: {str(self)}")
+        return self.mols.has_data("resubmission", True)
 
     @Selectors.calc_free_energy.add("app/g16/output")
     def calc_free_energy(self, keys: List[str] = ["g16_scf", "g16_corr_to_gibbs"], unit: Unit = Units.hartree):

@@ -25,7 +25,7 @@ class FuncSelector:
 class Selectors:
     read_atoms = FuncSelector()
     read_energy = FuncSelector()
-    read_correction = FuncSelector()
+    read_thermal = FuncSelector()
     check_end = FuncSelector()
     check_freq = FuncSelector()
     calc_free_energy = FuncSelector()
