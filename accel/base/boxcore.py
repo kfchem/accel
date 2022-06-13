@@ -145,6 +145,7 @@ class BoxCore:
             "history",
             "label",
             "energy",
+            "distribution",
             "charge",
             "multiplicity",
         ]
@@ -157,12 +158,13 @@ class BoxCore:
             data_dict["history"] = _c.history
             data_dict["label"] = _c.label
             data_dict["energy"] = _c.energy
+            data_dict["distribution"] = _c.distribution
             data_dict["charge"] = _c.charge
             data_dict["multiplicity"] = _c.multiplicity
             for _key, _val in _c.data._data.items():
                 str_val = str(_val)
                 if len(str_val) >= 256:
-                    data_dict[_key] = "too long data"
+                    data_dict[_key] = "######"
                 else:
                     data_dict[_key] = str_val
                 if _key not in column_keys:
