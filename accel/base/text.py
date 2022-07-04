@@ -1,12 +1,11 @@
 from pathlib import Path
-from typing import List
 
 from accel.base.mols import Mol
 from accel.base.tools import change_dir, float_to_str
 from accel.util.log import logger
 
 
-def replace_key(conf: Mol, lines: List[str]):
+def replace_key(conf: Mol, lines: list[str]):
     _rls = "".join(lines)
     while True:
         if "#NAME#" in _rls:
@@ -51,7 +50,20 @@ def replace_key(conf: Mol, lines: List[str]):
     return _rls[:-1]
 
 
-def write_input(_c: Mol, template: Path, odir=None, change_path=False):
+def replace_arg(conf: Mol, lines: list[str], arg: dict[str, str]):
+    _rls = "".join(lines)
+    while True:
+        for key, val in arg.items():
+            if f"#{key}#" in _rls:
+                _rls = _rls.replace(f"#{key}#", val)
+                break
+        else:
+            break
+    _rls = [_l + "\n" for _l in _rls.split("\n")]
+    return _rls[:-1]
+
+
+def write_input(_c: Mol, template: Path, odir=None, link=False, arg: dict[str, str] = None):
     _tp = Path(template).resolve()
     if not _tp.exists():
         logger.error(f"{str(_tp)} not exist")
@@ -59,9 +71,12 @@ def write_input(_c: Mol, template: Path, odir=None, change_path=False):
     with _tp.open("r") as f:
         _ls = f.readlines()
     _ls = replace_key(_c, _ls)
+    if arg is not None:
+        arg = {str(_k): str(_v) for _k, _v in arg.items()}
+        _ls = replace_arg(_c, _ls, arg)
     _p = change_dir(_c.path, odir, _c.name).with_suffix(_tp.suffix)
     with _p.open("w", newline="\n") as f:
         f.writelines(_ls)
     logger.info(f"{_p.name} created")
-    if change_path:
+    if link:
         _c.path = _p

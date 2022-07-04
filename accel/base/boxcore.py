@@ -337,7 +337,7 @@ class BoxCore:
 
     def write_input(self, template: Path, directory=None, link: bool = True, arg: Dict[str, str] = None):
         for _c in self.mols:
-            text.write_input(_c, template, directory, link)
+            text.write_input(_c=_c, template=template, odir=directory, link=link, arg=arg)
         Log.set_output_dir(directory)
         logger.debug(f"done: {str(self)}")
         return self

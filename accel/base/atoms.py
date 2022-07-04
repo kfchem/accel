@@ -382,8 +382,10 @@ def _get_maps(
     def _is_proper_bonding(atom_a: Atom, atom_b: Atom, side_pairs: List[Tuple[Atom]]):
         atom_a_bonds = atom_a.bonds
         atom_b_bonds = atom_b.bonds
+        # shoud swap here
         if len(atom_a_bonds) != len(atom_b_bonds):
             return True
+        # and here
         if len([a for a in atom_a_bonds if a.symbol == "H"]) != len([a for a in atom_b_bonds if a.symbol == "H"]):
             return False
         a_side_pairs = [_ab[0] for _ab in side_pairs]
