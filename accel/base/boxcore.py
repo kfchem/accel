@@ -29,7 +29,10 @@ def _add(_c, mulcos: "BoxCore"):
         if _pc.is_dir():
             return _add(_pc.iterdir(), mulcos)
     mulcos._mols.append(_c)
-    logger.info(f"added: {str(mulcos._mols[-1].path.absolute())}")
+    if mulcos._mols[-1].path is None:
+        logger.info(f"added: {mulcos._mols[-1].name}")
+    else:
+        logger.info(f"added: {str(mulcos._mols[-1].path.absolute())}")
     return None
 
 
