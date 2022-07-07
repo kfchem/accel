@@ -4,7 +4,7 @@ from typing import Dict, List
 
 import numpy as np
 from accel.base.atoms import Atom, Atoms, BondType
-from accel.base.mols import Mols, Mol
+from accel.base.mols import Mol, Mols
 from accel.util.constants import Elements
 from accel.util.log import logger
 from accel.util.matrix import Matrix
@@ -279,7 +279,7 @@ def embed_symm(_c: Mol):
             rot_mat = _a.cache["isomeric_subs_list"][0]["matrix"]
             rot_mat = rot_mat.astype(int)
             rotamer_mat_list.append(rot_mat)
-        elif [len(_a.bonds), len(_a.cache["isomeric_subs_list"])] in [[4, 3]]:
+        elif [len(_a.bonds), len(_a.cache["isomeric_subs_list"])] in [[4, 3], [4, 6]]:
             for _ps in _a.cache["isomeric_subs_list"][1:]:
                 rot_mat = np.dot(_ps["matrix"], _a.cache["isomeric_subs_list"][0]["matrix"])
                 rot_mat = rot_mat.astype(int)
@@ -308,6 +308,7 @@ def embed_symm(_c: Mol):
                 invalid_count += 1
         return invalid_count
 
+    # for TMS, cyclic_chiral_check has error
     def _cyclic_chiral_check(_c: Mol, rotamer_mat_list, numisomer_mat_list):
         unchanged_flag = True
         for rot_mat in rotamer_mat_list:
