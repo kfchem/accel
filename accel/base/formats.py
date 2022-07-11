@@ -138,6 +138,8 @@ def read_mol(_c: Mol):
                 _c.atoms.get(int(_prop[(2 * i) + 3])).charge = int(_prop[(2 * i) + 4])
     _total_charge = 0
     for _a in _c.atoms:
+        if _a.charge is None:
+            continue
         _total_charge += _a.charge
     _c.total_charge = _total_charge
     logger.debug(f"read {_c.name}")
@@ -168,9 +170,12 @@ def get_mol_str(_c: Mol, centering=True) -> str:
         else:
             _xyz = [float_to_str(round(_v, _prec)) for _v in _xyz]
         try:
-            _chg = conv_sdf_charge.index(int(_a.charge))
-        except ValueError:
-            logger.error(f"could not recognize charge: {_a.charge}")
+            if _a.charge is None:
+                _chg = 0
+            else:
+                _chg = conv_sdf_charge.index(int(_a.charge))
+        except (ValueError, TypeError):
+            logger.error(f"could not recognize charge: {str(_a)}")
             _chg = 0
         _ls.append(
             "{:>10.4f}{:>10.4f}{:>10.4f} {:<3s} 0{:>3d}  0  0  0  0                  \n".format(

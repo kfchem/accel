@@ -108,7 +108,10 @@ class Mol:
         if self.total_charge is not None:
             return self.total_charge
         else:
-            return sum(_a.charge for _a in self.atoms)
+            try:
+                return sum(_a.charge for _a in self.atoms)
+            except TypeError:
+                return None
 
     @charge.setter
     def charge_setter(self, value):

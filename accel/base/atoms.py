@@ -55,7 +55,7 @@ class Atom:
         self.z: float = 0.0
         self.data = Data(self)
         self.cache = {}
-        self.charge: int = 0
+        self.charge: int = None
         self._atoms: Atoms = parent_atoms
 
     def __str__(self):

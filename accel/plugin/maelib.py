@@ -106,6 +106,12 @@ def _embed_f_m_ct(_c: Mol, f_m_ct: Dict[str, Union[str, List]]):
         )
         if "i_m_formal_charge" in _m_atom:
             _c.atoms[-1].charge = int(_m_atom["i_m_formal_charge"])
+    _total_charge = 0
+    for _a in _c.atoms:
+        if _a.charge is None:
+            continue
+        _total_charge += _a.charge
+    _c.total_charge = _total_charge
     for _m_bond in f_m_ct["m_bond"]:
         _number_a = int(_m_bond["i_m_from"])
         _number_b = int(_m_bond["i_m_to"])
