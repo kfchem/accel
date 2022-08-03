@@ -803,3 +803,41 @@ class Atoms(MutableSequence):
                     return_atoms.bonds[_from, _to] = val
             return_list.append(return_atoms)
         return return_list
+
+    def get_splitted(self) -> list["Atoms"]:
+        atom_ll: list[list[int]] = [[_a.number] for _a in self._list]
+        bonding_types = [
+            BondType.single,
+            BondType.double,
+            BondType.triple,
+            BondType.aromatic,
+            BondType.single_or_double,
+            BondType.single_or_aromatic,
+            BondType.double_or_aromatic,
+        ]
+        for _bond, _type in self.bonds.to_dict().items():
+            if _type not in bonding_types:
+                continue
+            new_l = []
+            for atom_l in atom_ll:
+                if _bond[0] in atom_l or _bond[1] in atom_l:
+                    new_l.extend(atom_l)
+                    atom_l.clear()
+            atom_ll.append(new_l)
+        atom_ll: list[list[int]] = [sorted(list(atom_l)) for atom_l in atom_ll if atom_l != []]
+        ret_list: list["Atoms"] = []
+        for atom_nums in atom_ll:
+            return_atoms = Atoms()
+            for _num in atom_nums:
+                return_atoms.append(self.get(_num))
+            if self.has_bonds():
+                return_atoms.init_bonds()
+                for fromto, val in self.bonds.to_dict().items():
+                    try:
+                        _from = atom_nums.index(fromto[0]) + 1
+                        _to = atom_nums.index(fromto[1]) + 1
+                    except ValueError:
+                        continue
+                    return_atoms.bonds[_from, _to] = val
+            ret_list.append(return_atoms)
+        return ret_list
