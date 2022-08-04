@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Union
+from typing import Union
 
 from accel.util.log import logger
 
@@ -9,11 +9,11 @@ class Execmd:
 
     @classmethod
     def get(cls, key: str) -> str:
-        _exe = cls._path_dict.get(str(key))
-        if _exe is None:
+        exe_string = cls._path_dict.get(str(key))
+        if exe_string is None:
             return key
         else:
-            return _exe
+            return exe_string
 
     @classmethod
     def add(cls, key: str, exe_cmd: Union[Path, str]) -> None:

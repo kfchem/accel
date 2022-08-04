@@ -46,15 +46,15 @@ def write_xyz(_c: System, output_dir=None, change_path=False, centering=True):
     if centering:
         _cnt = [mean([_a.xyz[i] for _a in _c.atoms]) for i in range(3)]
         try:
-            _prec = max(max(len(float_to_str(_a.xyz[i]).split(".")[1]) for _a in _c.atoms) for i in range(3))
+            prec = max(max(len(float_to_str(_a.xyz[i]).split(".")[1]) for _a in _c.atoms) for i in range(3))
         except IndexError:
             logger.error(f"could not resolve the precision in converting to xyz file of {_c.name}")
-            _prec = 10
-        _cnt = [round(_v, _prec) for _v in _cnt]
+            prec = 10
+        _cnt = [round(_v, prec) for _v in _cnt]
     for _a in _c.atoms:
         _xyz = [_a.x, _a.y, _a.z]
         if centering:
-            _xyz = [float_to_str(round(_v - _cnt[i], _prec)) for i, _v in enumerate(_xyz)]
+            _xyz = [float_to_str(round(_v - _cnt[i], prec)) for i, _v in enumerate(_xyz)]
         _xyz = [float_to_str(_v) for _v in _xyz]
         _ls.append(f"{_a.symbol:<2} {_xyz[0]:>15} {_xyz[1]:>15} {_xyz[2]:>15}\n")
     _p = change_dir(_c.path, output_dir, _c.name).with_suffix(".xyz")
@@ -130,12 +130,12 @@ def read_mol(_c: System):
             _c.atoms.add_bond(_number_a, _number_b, BondType.aromatic)
         else:
             _c.atoms.add_bond(_number_a, _number_b, BondType.undefined)
-    for _prop in _c.data["sdf"]["properties"]:
-        _prop: str = _prop
-        if _prop.startswith("M  CHG"):
-            _prop = _prop.split()
-            for i in range(int(_prop[2])):
-                _c.atoms.get(int(_prop[(2 * i) + 3])).charge = int(_prop[(2 * i) + 4])
+    for prop in _c.data["sdf"]["properties"]:
+        prop: str = prop
+        if prop.startswith("M  CHG"):
+            prop = prop.split()
+            for i in range(int(prop[2])):
+                _c.atoms.get(int(prop[(2 * i) + 3])).charge = int(prop[(2 * i) + 4])
     _total_charge = 0
     for _a in _c.atoms:
         if _a.charge is None:
@@ -159,16 +159,16 @@ def get_mol_str(_c: System, centering=True) -> str:
     _ls.append("  ACCeL   {}3D            {:12}      \n".format(_now.strftime("%m%d%y%H%M"), _energy))
     _ls.append("\n")
     _ls.append(f"{len(_c.atoms):>3d}{len(_c.atoms.bonds):>3d}  0  0  1  0            999 V2000\n")
-    _prec = 4
+    prec = 4
     if centering:
         _cnt = [mean([_a.xyz[i] for _a in _c.atoms]) for i in range(3)]
-        _cnt = [round(_v, _prec) for _v in _cnt]
+        _cnt = [round(_v, prec) for _v in _cnt]
     for _a in _c.atoms:
         _xyz = [_a.x, _a.y, _a.z]
         if centering:
-            _xyz = [float_to_str(round(_v - _cnt[i], _prec)) for i, _v in enumerate(_xyz)]
+            _xyz = [float_to_str(round(_v - _cnt[i], prec)) for i, _v in enumerate(_xyz)]
         else:
-            _xyz = [float_to_str(round(_v, _prec)) for _v in _xyz]
+            _xyz = [float_to_str(round(_v, prec)) for _v in _xyz]
         try:
             if _a.charge is None:
                 _chg = 0

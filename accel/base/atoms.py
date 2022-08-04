@@ -1,7 +1,7 @@
 import copy
 from collections import deque
 from collections.abc import MutableSequence
-from typing import Iterator, List, MutableMapping, Sequence, Set, Tuple
+from typing import Iterator, MutableMapping, Sequence, Set, Tuple
 
 import numpy as np
 from accel.util.constants import Elements
@@ -48,7 +48,7 @@ class Atom:
         "_atoms",
     ]
 
-    def __init__(self, parent_atoms: "Atoms" = None):
+    def __init__(self, parent: "Atoms" = None):
         self._symbol: str = ""
         self.x: float = 0.0
         self.y: float = 0.0
@@ -56,7 +56,7 @@ class Atom:
         self.data = Data(self)
         self.cache = {}
         self.charge: int = None
-        self._atoms: Atoms = parent_atoms
+        self._atoms: Atoms = parent
 
     def __str__(self):
         if self._atoms is None:
@@ -147,16 +147,16 @@ class Atom:
         self.z = self.z + float(vector[0])
         return self
 
-    def duplicate(self, parent_atoms=None) -> "Atom":
-        _n = Atom(parent_atoms)
-        _n._symbol = self._symbol
-        _n.x = self.x
-        _n.y = self.y
-        _n.z = self.z
-        _n.data = self.data.duplicate(_n)
-        _n.cache = self.cache
-        _n.charge = self.charge
-        return _n
+    def duplicate(self, atoms=None) -> "Atom":
+        n = Atom(atoms)
+        n._symbol = self._symbol
+        n.x = self.x
+        n.y = self.y
+        n.z = self.z
+        n.data = self.data.duplicate(n)
+        n.cache = copy.deepcopy(self.cache)
+        n.charge = self.charge
+        return n
 
     def show(self):
         data_dict = {}
@@ -276,8 +276,8 @@ def _get_maps(
         given_known_bs = []
     else:
         known_check = True
-        given_known_as = [atoms_a.get(_pr[0]) for _pr in known_pairs]
-        given_known_bs = [atoms_b.get(_pr[1]) for _pr in known_pairs]
+        given_known_as = [atoms_a.get(pr[0]) for pr in known_pairs]
+        given_known_bs = [atoms_b.get(pr[1]) for pr in known_pairs]
         if None in given_known_as or None in given_known_bs:
             logger.error(f"invalid known_pairs: {known_pairs}")
             return []
@@ -345,21 +345,21 @@ def _get_maps(
                 initial_pairs.append((atom_a, atom_b))
 
     if len(initial_pairs) == 0:
-        _appended_known_idxs = None
+        appended_known_idxs = None
         for atom_a in atoms_a:
             for atom_b in atoms_b:
                 if known_check:
                     if _should_exclude(atom_a, atom_b):
                         continue
-                    _known_a_idxs = [given_known_as.index(_a) for _a in atom_a.bonds if _a in given_known_as]
-                    _known_a_idxs = sorted(_known_a_idxs)
-                    _known_b_idxs = [given_known_bs.index(_b) for _b in atom_b.bonds if _b in given_known_bs]
-                    _known_b_idxs = sorted(_known_b_idxs)
-                    if len(_known_a_idxs) == 0 or len(_known_b_idxs) == 0:
+                    known_a_idxs = [given_known_as.index(_a) for _a in atom_a.bonds if _a in given_known_as]
+                    known_a_idxs = sorted(known_a_idxs)
+                    known_b_idxs = [given_known_bs.index(_b) for _b in atom_b.bonds if _b in given_known_bs]
+                    known_b_idxs = sorted(known_b_idxs)
+                    if len(known_a_idxs) == 0 or len(known_b_idxs) == 0:
                         continue
-                    if _known_a_idxs == _known_b_idxs:
-                        if _appended_known_idxs is None or _appended_known_idxs == _known_a_idxs:
-                            _appended_known_idxs = _known_a_idxs
+                    if known_a_idxs == known_b_idxs:
+                        if appended_known_idxs is None or appended_known_idxs == known_a_idxs:
+                            appended_known_idxs = known_a_idxs
                             initial_pairs.append((atom_a, atom_b))
 
     if len(initial_pairs) == 0:
@@ -379,7 +379,7 @@ def _get_maps(
                         continue
                 initial_pairs.append((atom_a, atom_b))
 
-    def _is_proper_bonding(atom_a: Atom, atom_b: Atom, side_pairs: list[Tuple[Atom]]):
+    def _isproper_bonding(atom_a: Atom, atom_b: Atom, side_pairs: list[Tuple[Atom]]):
         atom_a_bonds = atom_a.bonds
         atom_b_bonds = atom_b.bonds
         # shoud swap here
@@ -403,12 +403,12 @@ def _get_maps(
             side_pairs: list[Tuple[Atom]] = stack.pop()
             if len(side_pairs) > len(initial_chains[-1]):
                 initial_chains = [side_pairs]
-                logger.debug(f"initial_chains updated: {[(_pr[0].number, _pr[1].number) for _pr in side_pairs]}")
+                logger.debug(f"initial_chains updated: {[(pr[0].number, pr[1].number) for pr in side_pairs]}")
             elif len(side_pairs) == len(initial_chains[-1]):
                 initial_chains.append(side_pairs)
-                logger.debug(f"initial_chains appended: {[(_pr[0].number, _pr[1].number) for _pr in side_pairs]}")
-            a_list = [_pr[0] for _pr in side_pairs]
-            b_list = [_pr[1] for _pr in side_pairs]
+                logger.debug(f"initial_chains appended: {[(pr[0].number, pr[1].number) for pr in side_pairs]}")
+            a_list = [pr[0] for pr in side_pairs]
+            b_list = [pr[1] for pr in side_pairs]
             for next_a in side_pairs[-1][0].bonds:
                 if next_a.symbol == "H" or next_a in a_list:
                     continue
@@ -420,7 +420,7 @@ def _get_maps(
                     if known_check:
                         if _should_exclude(next_a, next_b):
                             continue
-                    if not _is_proper_bonding(next_a, next_b, side_pairs):
+                    if not _isproper_bonding(next_a, next_b, side_pairs):
                         continue
                     stack.append(side_pairs + [(next_a, next_b)])
 
@@ -429,19 +429,19 @@ def _get_maps(
 
     canonical_initial_chains: dict[list[set], Tuple[Tuple[Atom]]] = {}
     for chain in initial_chains:
-        key = tuple(sorted([(_pr[0].number, _pr[1].number) for _pr in chain], key=lambda t: t[0]))
+        key = tuple(sorted([(pr[0].number, pr[1].number) for pr in chain], key=lambda t: t[0]))
         canonical_initial_chains[key] = chain
 
     for chain in canonical_initial_chains.values():
-        logger.debug(f"canonical_initial_chains: {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
+        logger.debug(f"canonical_initial_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
     min_invalid = None
     h_matched_chains: list[list[Tuple[Atom]]] = [[]]
     for chain in canonical_initial_chains.values():
         invalid_atoms = 0
         for pair in chain:
-            hs_of_a = [_a for _a in pair[0].bonds if _a.symbol == "H"]
-            hs_of_b = [_b for _b in pair[1].bonds if _b.symbol == "H"]
+            hs_of_a = [a_ for a_ in pair[0].bonds if a_.symbol == "H"]
+            hs_of_b = [b_ for b_ in pair[1].bonds if b_.symbol == "H"]
             if len(hs_of_a) != len(hs_of_b):
                 invalid_atoms += 1
         if min_invalid is None or min_invalid > invalid_atoms:
@@ -451,33 +451,33 @@ def _get_maps(
             h_matched_chains.append(chain)
 
     for chain in h_matched_chains:
-        logger.debug(f"h_matched_chains: {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
+        logger.debug(f"h_matched_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
     def _det_ez(a: Atom, b: Atom, c: Atom, d: Atom) -> bool:
-        _vab = np.array(a.xyz) - np.array(b.xyz)
-        _vcb = np.array(c.xyz) - np.array(b.xyz)
-        _vdc = np.array(d.xyz) - np.array(c.xyz)
-        _pvac = np.cross(_vab, _vcb)
-        _pvbd = np.cross(_vdc, _vcb)
-        _angle = np.arccos(np.sum(_pvac * _pvbd) / (np.linalg.norm(_pvac) * np.linalg.norm(_pvbd)))
-        if np.sum(_pvac * np.cross(_pvbd, _vcb)) < 0:
-            _angle = -_angle
-        _angle = float(np.rad2deg(_angle))
-        if _angle > 90 or _angle < -90:
+        vab = np.array(a.xyz) - np.array(b.xyz)
+        vcb = np.array(c.xyz) - np.array(b.xyz)
+        vdc = np.array(d.xyz) - np.array(c.xyz)
+        pvac = np.cross(vab, vcb)
+        pvbd = np.cross(vdc, vcb)
+        angle = np.arccos(np.sum(pvac * pvbd) / (np.linalg.norm(pvac) * np.linalg.norm(pvbd)))
+        if np.sum(pvac * np.cross(pvbd, vcb)) < 0:
+            angle = -angle
+        angle = float(np.rad2deg(angle))
+        if angle > 90 or angle < -90:
             return True
         return False
 
     def _det_chirality(a: Atom, b: Atom, c: Atom, d: Atom) -> bool:
-        neighbors_xyz = np.array([_atom.xyz for _atom in [b, c, d]]) - np.array(a.xyz)
+        neighbors_xyz = np.array([atom_.xyz for atom_ in [b, c, d]]) - np.array(a.xyz)
         if np.linalg.det(neighbors_xyz) > 0:
             return True
         return False
 
     extended_chains: list[list[Tuple[Atom]]] = []
     for chain in h_matched_chains:
-        stack = deque([_pr for _pr in chain])
-        assigned_as = given_known_as + [_pr[0] for _pr in chain]
-        assigned_bs = given_known_bs + [_pr[1] for _pr in chain]
+        stack = deque([pr for pr in chain])
+        assigned_as = given_known_as + [pr[0] for pr in chain]
+        assigned_bs = given_known_bs + [pr[1] for pr in chain]
 
         def _new_assign(new_pair: Tuple[Atom], root_pair: Tuple[Atom]):
             assigned_as.append(new_pair[0])
@@ -575,11 +575,11 @@ def _get_maps(
 
     canonical_extended_chains: dict[Tuple[Tuple[int]], list[Tuple[Atom]]] = {}
     for chain in extended_chains:
-        key = tuple(sorted([(_pr[0].number, _pr[1].number) for _pr in chain], key=lambda t: t[0]))
+        key = tuple(sorted([(pr[0].number, pr[1].number) for pr in chain], key=lambda t: t[0]))
         canonical_extended_chains[key] = chain
 
     for chain in canonical_extended_chains.values():
-        logger.debug(f"canonical_extended_chains: {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
+        logger.debug(f"canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
     recursive_extended_chains: list[list[Tuple[Atom]]] = []
     for chain in canonical_extended_chains.values():
@@ -597,11 +597,11 @@ def _get_maps(
     for chain in recursive_extended_chains:
         if exclude_known:
             chain = chain[len(known_pairs) :]
-        key = tuple(sorted([(_pr[0].number, _pr[1].number) for _pr in chain], key=lambda t: t[0]))
+        key = tuple(sorted([(pr[0].number, pr[1].number) for pr in chain], key=lambda t: t[0]))
         canonical_recursive_extended_chains[key] = chain
 
     for chain in canonical_recursive_extended_chains.values():
-        logger.debug(f"canonical_recursive_extended_chains: {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
+        logger.debug(f"canonical_recursive_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
     return canonical_recursive_extended_chains.values()
 
@@ -728,19 +728,19 @@ class Atoms(MutableSequence):
     def mw(self) -> float:
         logger.error("not implemented yet: returns incorrect values")
         mol_weight = 0
-        for _a in self._list:
-            if _a.symbol == "H":
+        for a in self._list:
+            if a.symbol == "H":
                 mol_weight += 1
                 continue
-            mol_weight += Elements.get_element(_a.symbol)["number"] * 2
+            mol_weight += Elements.get_element(a.symbol)["number"] * 2
         return mol_weight
 
     def show(self):
-        for _a in self._list:
-            logger.info(f"{str(_a):>4}: {_a.x:>8.4f}: {_a.y:>7.4f}: {_a.z:>7.4f}")
+        for a in self._list:
+            logger.info(f"{str(a):>4}: {a.x:>8.4f}: {a.y:>7.4f}: {a.z:>7.4f}")
         return self
 
-    def bind(self, value: List):
+    def bind(self, value: list):
         self._list = value
         return self
 
@@ -753,11 +753,11 @@ class Atoms(MutableSequence):
         atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self, atoms_map)
         for chain in atoms_map:
-            logger.debug(f"maps (target, self): {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
+            logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
         return_chains = []
         for chain in atoms_map:
-            chain_target = [_pr[0] for _pr in chain]
-            chain_self = [_pr[1] for _pr in chain]
+            chain_target = [pr[0] for pr in chain]
+            chain_self = [pr[1] for pr in chain]
             return_nums = []
             for atom_self in self:
                 try:
@@ -777,11 +777,11 @@ class Atoms(MutableSequence):
         atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self, atoms_map)
         for chain in atoms_map:
-            logger.debug(f"maps (target, self): {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
+            logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
         return_list = []
         for chain in atoms_map:
-            chain_target = [_pr[0] for _pr in chain]
-            chain_self = [_pr[1] for _pr in chain]
+            chain_target = [pr[0] for pr in chain]
+            chain_self = [pr[1] for pr in chain]
             return_atoms = Atoms()
             mapped_numbers = []
             for atom_target in target:

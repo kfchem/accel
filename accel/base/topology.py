@@ -345,7 +345,7 @@ def embed_symm(_c: System):
     _del_visited_flags(_c)
 
 
-def rmsd_pruning(
+def rmsdpruning(
     confs: Systems,
     rmsd_threshold: float = 0.01,
     for_all: bool = False,

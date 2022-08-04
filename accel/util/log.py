@@ -66,10 +66,10 @@ class Log:
         cls.logger.removeHandler(cls.temp_handler)
         cls.temp_handler = None
         cls.temp_file.seek(0)
-        _ls = cls.temp_file.readlines()
+        ls = cls.temp_file.readlines()
         cls.temp_file.close()
         with filepath.open("a") as f:
-            f.writelines(_ls)
+            f.writelines(ls)
 
     @classmethod
     def file(cls, filepath=None, level="DEBUG"):
@@ -103,17 +103,17 @@ class Log:
             cls.temp_handler = None
             cls.temp_file.close()
             return None
-        _dir = Path.cwd()
+        directory = Path.cwd()
         if cls.input_dir is not None:
-            _dir = cls.input_dir
+            directory = cls.input_dir
         if cls.output_dir is not None:
-            _dir = cls.output_dir
-        _dir = Path(_dir)
-        _name = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        _p = _dir / f"{_name}.mcl"
-        _p = _p.absolute()
-        cls.logger.info(f"log: {str(_p)}")
-        cls.flush(_p)
+            directory = cls.output_dir
+        directory = Path(directory)
+        filename = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        p = directory / f"{filename}.mcl"
+        p = p.absolute()
+        cls.logger.info(f"log: {str(p)}")
+        cls.flush(p)
 
 
 atexit.register(Log.force_flush)

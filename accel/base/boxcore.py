@@ -343,7 +343,7 @@ class BoxCore:
 
     def write_input(self, template: Path, directory=None, link: bool = True, arg: dict[str, str] = None):
         for c in self.get():
-            text.write_input(_c=c, template=template, odir=directory, link=link, arg=arg)
+            text.write_input(system=c, template=template, odir=directory, link=link, arg=arg)
         Log.set_output_dir(directory)
         logger.debug(f"done: {str(self)}")
         return self
@@ -402,7 +402,7 @@ class BoxCore:
         if len(self.get()) != len(self.get().has_data("has_symm", True)):
             logger.info("embed_symm called automatically")
             self.calc_symm()
-        topology.rmsd_pruning(
+        topology.rmsdpruning(
             self.get(),
             threshold,
             all_combinations_of_confs,
@@ -414,19 +414,19 @@ class BoxCore:
 
     def map_numbers(self, reference_box: "BoxCore" = None):
         if reference_box is None:
-            reference_box = BoxCore([_confs.get() for _confs in self.get().labels.values()])
-        r_mulcos = reference_box.duplicate()
-        r_mulcos.calc_bonds()
-        r_mulcos.calc_symm()
-        topology.map_numbers(self.get(), r_mulcos.contents)
+            reference_box = BoxCore([cs.get() for cs in self.get().labels.values()])
+        rbox = reference_box.duplicate()
+        rbox.calc_bonds()
+        rbox.calc_symm()
+        topology.map_numbers(self.get(), rbox.contents)
         logger.debug(f"done: {str(self)}")
         return self
 
     def calc_length(self, number_a: int, number_b: int, key: str = ""):
         number_a = int(number_a)
         number_b = int(number_b)
-        for _c in self.get():
-            xyz.calc_length(_c, number_a, number_b, key)
+        for c in self.get():
+            xyz.calc_length(c, number_a, number_b, key)
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -435,8 +435,8 @@ class BoxCore:
         number_b = int(number_b)
         number_c = int(number_c)
         number_d = int(number_d)
-        for _c in self.get():
-            xyz.calc_dihedral(_c, number_a, number_b, number_c, number_d, key)
+        for c in self.get():
+            xyz.calc_dihedral(c, number_a, number_b, number_c, number_d, key)
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -455,42 +455,42 @@ class BoxCore:
             logger.info("all of active conformers do not have distribution data")
             logger.info("calc_distr called automatically")
             self.calc_distribution()
-        for label, _ref_confs in self.get().labels.items():
-            _c = System()
-            _ref_one = _ref_confs.get()
-            new_ls.append(_c)
-            _c.name = label
-            _c.energy = _ref_one.energy
-            _c.label = label
-            for _ref_a in _ref_one.atoms:
-                _c.atoms.get_new_atom().axyz = _ref_a.axyz
-            for _ref_c in _ref_confs:
-                if len(_ref_c.atoms) != len(_c.atoms):
+        for label, ref_cs in self.get().labels.items():
+            c = System()
+            _ref_one = ref_cs.get()
+            new_ls.append(c)
+            c.name = label
+            c.energy = _ref_one.energy
+            c.label = label
+            for ref_a in _ref_one.atoms:
+                c.atoms.get_new_atom().axyz = ref_a.axyz
+            for ref_c in ref_cs:
+                if len(ref_c.atoms) != len(c.atoms):
                     logger.error("atomic symbol does not matched")
                     raise Exception
-                for _ref_a in _ref_c.atoms:
-                    if _c.atoms.get(_ref_a.number).symbol != _ref_a.symbol:
+                for ref_a in ref_c.atoms:
+                    if c.atoms.get(ref_a.number).symbol != ref_a.symbol:
                         logger.error("atomic symbol does not matched")
                         raise Exception
-        for _key in keys:
-            if len(self.get()) != len(self.get().has_data(_key)):
-                logger.info(f"all of active conformers do not have {_key} data")
+        for key in keys:
+            if len(self.get()) != len(self.get().has_data(key)):
+                logger.info(f"all of active conformers do not have {key} data")
                 continue
-            for _c in new_ls:
-                for _oc in self.get().labels.get(_c.name):
-                    _c.data[_key] += _oc.data[_key] * _oc.distribution
-        for _key in keys_for_atoms:
-            for _c in new_ls:
-                for _a in _c.atoms:
+            for c in new_ls:
+                for _oc in self.get().labels.get(c.name):
+                    c.data[key] += _oc.data[key] * _oc.distribution
+        for key in keys_for_atoms:
+            for c in new_ls:
+                for _a in c.atoms:
                     sum_val = 0.0
-                    for _oc in self.get().labels.get(_c.name):
-                        tmp_val = _oc.atoms.get(_a.number).data.get(_key)
+                    for _oc in self.get().labels.get(c.name):
+                        tmp_val = _oc.atoms.get(_a.number).data.get(key)
                         if tmp_val is None:
-                            logger.error(f"atom {_oc.atoms.get(_a.number)} of {_oc} have no {_key} data")
+                            logger.error(f"atom {_oc.atoms.get(_a.number)} of {_oc} have no {key} data")
                             break
                         sum_val += float(tmp_val) * _oc.distribution
                     else:
-                        _a.data[_key] = sum_val
+                        _a.data[key] = sum_val
         return Systems().bind(new_ls)
 
     def modify_length(
@@ -503,16 +503,16 @@ class BoxCore:
         numbers_along_with_a: Sequence[int] = [],
         numbers_along_with_b: Sequence[int] = [],
     ):
-        for _c in self.get():
+        for c in self.get():
             xyz.edit_bond_length(
-                _c, number_a, number_b, target, (bool(fix_a), bool(fix_b)), numbers_along_with_a, numbers_along_with_b
+                c, number_a, number_b, target, (bool(fix_a), bool(fix_b)), numbers_along_with_a, numbers_along_with_b
             )
         logger.debug(f"done: {str(self)}")
         return self
 
     def convert_to_mirror(self, centering: bool = True):
-        for _c in self.get():
-            xyz.convert_to_mirror(_c, centering)
+        for c in self.get():
+            xyz.convert_to_mirror(c, centering)
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -521,13 +521,13 @@ class BoxCore:
             if len(self.get()) != len(self.get().has_label()):
                 logger.info("labeling called automatically")
                 self.labeling()
-            for confs in self.get().labels.values():
-                _list = sorted(confs, key=lambda _c: _c.energy)
-                for _c in _list[1:]:
-                    _c.deactivate("only_minimum")
+            for cs in self.get().labels.values():
+                sorted_cs_list: list[System] = sorted(cs, key=lambda c: c.energy)
+                for c in sorted_cs_list[1:]:
+                    c.deactivate("only_minimum")
         else:
-            _list = sorted(self.get(), key=lambda _c: _c.energy)
-            for _c in _list[1:]:
-                _c.deactivate("only_minimum")
+            sorted_cs_list: list[System] = sorted(self.get(), key=lambda c: c.energy)
+            for c in sorted_cs_list[1:]:
+                c.deactivate("only_minimum")
         logger.debug(f"done: {str(self)}")
         return self

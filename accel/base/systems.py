@@ -109,7 +109,7 @@ class System:
             return self.total_charge
         else:
             try:
-                return sum(_a.charge for _a in self.atoms)
+                return sum(a.charge for a in self.atoms)
             except TypeError:
                 return None
 
@@ -156,20 +156,20 @@ class System:
         return self
 
     def duplicate(self) -> "System":
-        _n = System()
-        _n._initialized = False
-        _n.path = deepcopy(self.path)
-        _n.name = self.name
-        _n.label = self.label
-        _n.state = self.state
-        _n.energy = self.energy
-        _n.atoms = self.atoms.duplicate()
-        _n.data = self.data.duplicate(_n)
-        _n.cache = deepcopy(self.cache)
-        _n.total_charge = self.total_charge
-        _n.multiplicity = self.multiplicity
-        _n._initialized = True
-        return _n
+        n = System()
+        n._initialized = False
+        n.path = deepcopy(self.path)
+        n.name = self.name
+        n.label = self.label
+        n.state = self.state
+        n.energy = self.energy
+        n.atoms = self.atoms.duplicate()
+        n.data = self.data.duplicate(n)
+        n.cache = deepcopy(self.cache)
+        n.total_charge = self.total_charge
+        n.multiplicity = self.multiplicity
+        n._initialized = True
+        return n
 
 
 class Systems(MutableSequence):
@@ -209,20 +209,19 @@ class Systems(MutableSequence):
         return Systems().bind(self._list + other._list)
 
     def show(self):
-        for _index, _c in enumerate(self._list, 1):
-            _c: System = _c
+        for idx, c in enumerate(self._list, 1):
             _is_active = "ACTIVE"
-            if _c.state is False:
+            if c.state is False:
                 _is_active = "------"
-            if _c.energy is None:
+            if c.energy is None:
                 _energy = "----- kcal/mol"
             else:
-                _energy = f"{_c.energy:>5.1f} kcal/mol"
+                _energy = f"{c.energy:>5.1f} kcal/mol"
             try:
-                _path = _c.path.relative_to(Path.cwd())
+                _path = c.path.relative_to(Path.cwd())
             except ValueError:
-                _path = _c.path.absolute()
-            logger.info(f"{_index:>4}: {_c.name:<18}: {_is_active:<7}: {_c.label:<12}: {_energy}: {str(_path)}")
+                _path = c.path.absolute()
+            logger.info(f"{idx:>4}: {c.name:<18}: {_is_active:<7}: {c.label:<12}: {_energy}: {str(_path)}")
 
     def insert(self, index: int, value: Union[System, Path, str]):
         new_conformer = self._new_confomer(value)
@@ -236,7 +235,7 @@ class Systems(MutableSequence):
         return self
 
     def to_list(self) -> list[System]:
-        return [_c for _c in self._list]
+        return [c for c in self._list]
 
     def bind(self, data_list: list[System]):
         if isinstance(data_list, list):
@@ -246,31 +245,31 @@ class Systems(MutableSequence):
         return self
 
     def duplicate(self, parent_obj=None) -> "Systems":
-        _n = Systems()
-        _n._list = [_c.duplicate() for _c in self._list]
-        return _n
+        n = Systems()
+        n._list = [c.duplicate() for c in self._list]
+        return n
 
     @property
     def labels(self) -> dict[str, "Systems"]:
         label_dict = defaultdict(list)
-        for _c in self._list:
-            label_dict[_c.label].append(_c)
+        for c in self._list:
+            label_dict[c.label].append(c)
         sorted_dict = {}
-        for _key in sorted(label_dict.keys()):
-            sorted_dict[_key] = Systems().bind(label_dict[_key])
+        for key in sorted(label_dict.keys()):
+            sorted_dict[key] = Systems().bind(label_dict[key])
         return sorted_dict
 
     @property
     def filetypes(self) -> dict[str, "Systems"]:
         filetype_dict = defaultdict(list)
-        for _c in self._list:
-            if _c.filetype is None:
-                filetype_dict[""].append(_c)
+        for c in self._list:
+            if c.filetype is None:
+                filetype_dict[""].append(c)
             else:
-                filetype_dict[_c.filetype].append(_c)
+                filetype_dict[c.filetype].append(c)
         sorted_dict = {}
-        for _key in sorted(filetype_dict.keys()):
-            sorted_dict[_key] = Systems().bind(filetype_dict[_key])
+        for key in sorted(filetype_dict.keys()):
+            sorted_dict[key] = Systems().bind(filetype_dict[key])
         return sorted_dict
 
     def has_state(self, state: Union[bool, None] = True) -> "Systems":
@@ -283,54 +282,54 @@ class Systems(MutableSequence):
         return Systems().bind([_c for _c in self._list if _c.atoms.has_bonds() is flag])
 
     def has_energy(self, min_limit: float = None, max_limit: float = None) -> "Systems":
-        _cs = [_c for _c in self._list if _c.energy is not None]
+        c_list = [c for c in self._list if c.energy is not None]
         if min_limit is None and max_limit is None:
-            return Systems().bind(_cs)
-        if len(_cs) == 0:
-            return Systems().bind(_cs)
+            return Systems().bind(c_list)
+        if len(c_list) == 0:
+            return Systems().bind(c_list)
         if min_limit is None:
-            min_limit = min(_c.energy for _c in _cs)
+            min_limit = min(_c.energy for _c in c_list)
         else:
             min_limit = float(min_limit)
         if max_limit is None:
-            max_limit = max(_c.energy for _c in _cs)
+            max_limit = max(_c.energy for _c in c_list)
         else:
             max_limit = float(max_limit)
-        _cs = [_c for _c in _cs if min_limit <= _c.energy and _c.energy <= max_limit]
-        return Systems().bind(_cs)
+        c_list = [_c for _c in c_list if min_limit <= _c.energy and _c.energy <= max_limit]
+        return Systems().bind(c_list)
 
     def has_label(self, label: str = None) -> "Systems":
         if label is None:
-            return Systems().bind([_c for _c in self._list if _c.label != ""])
+            return Systems().bind([c for c in self._list if c.label != ""])
         else:
-            _cs = self.labels.get(label)
-            if _cs is None:
+            cs = self.labels.get(label)
+            if cs is None:
                 return Systems()
-            return _cs
+            return cs
 
     def has_distribution(self, min_limit: float = None, max_limit: float = None) -> "Systems":
-        _cs = [_c for _c in self._list if _c.distribution is not None]
+        cs = [c for c in self._list if c.distribution is not None]
         if min_limit is None and max_limit is None:
-            return Systems().bind(_cs)
-        if len(_cs) == 0:
-            return Systems().bind(_cs)
+            return Systems().bind(cs)
+        if len(cs) == 0:
+            return Systems().bind(cs)
         if min_limit is None:
-            min_limit = min(_c.distribution for _c in _cs)
+            min_limit = min(_c.distribution for _c in cs)
         else:
             min_limit = float(min_limit)
         if max_limit is None:
-            max_limit = max(_c.distribution for _c in _cs)
+            max_limit = max(_c.distribution for _c in cs)
         else:
             max_limit = float(max_limit)
-        _cs = [_c for _c in _cs if min_limit <= _c.distribution and _c.distribution <= max_limit]
-        return Systems().bind(_cs)
+        cs = [c for c in cs if min_limit <= c.distribution and c.distribution <= max_limit]
+        return Systems().bind(cs)
 
     def has_data(self, key: str, value=None) -> "Systems":
         if value is None:
-            _cs = [_c for _c in self._list if key in _c.data.keys()]
+            c_list = [_c for _c in self._list if key in _c.data.keys()]
         else:
-            _cs = [_c for _c in self._list if _c.data.get(key) is value]
-        return Systems().bind(_cs)
+            c_list = [_c for _c in self._list if _c.data.get(key) is value]
+        return Systems().bind(c_list)
 
     def has_filetype(self, filetype: str) -> "Systems":
         return Systems().bind([_c for _c in self._list if _c.filetype is filetype])
@@ -349,20 +348,20 @@ class Systems(MutableSequence):
             else:
                 return None
         elif isinstance(identifier, str):
-            for _c in self._list:
-                if identifier in _c.name:
-                    return _c
+            for c in self._list:
+                if identifier in c.name:
+                    return c
             else:
                 return None
         return None
 
     def sorted(self, key="energy") -> "Systems":
         if key == "energy":
-            new_list = sorted(self._list, key=lambda _c: _c.energy)
+            new_list = sorted(self._list, key=lambda c: c.energy)
         elif key == "name":
-            new_list = sorted(self._list, key=lambda _c: _c.name)
+            new_list = sorted(self._list, key=lambda c: c.name)
         elif key == "label":
-            new_list = sorted(self._list, key=lambda _c: _c.label)
+            new_list = sorted(self._list, key=lambda c: c.label)
         else:
-            new_list = sorted(self._list, key=lambda _c: _c.data.get(key))
+            new_list = sorted(self._list, key=lambda c: c.data.get(key))
         return Systems().bind(new_list)

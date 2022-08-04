@@ -2,7 +2,6 @@ import statistics
 import subprocess
 from collections import defaultdict
 from pathlib import Path
-from typing import List
 
 import numpy as np
 from accel.base.boxcore import BoxCore
@@ -14,123 +13,123 @@ from accel.util.log import logger
 
 
 # not coding yet
-def read_multiple_xyz(mulcos: BoxCore):
+def read_multiple_xyz(box: BoxCore):
     pass
 
 
-def calc_sum_energy(mulcos: BoxCore):
-    for _c in mulcos.get():
-        _c.data["g16_t_zero"] = _c.data["g16_zpc"] + _c.data["g16_scf"]
-        _c.data["g16_t_energy"] = _c.data["g16_corr_to_energy"] + _c.data["g16_scf"]
-        _c.data["g16_t_enthalpy"] = _c.data["g16_corr_to_enthalpy"] + _c.data["g16_scf"]
-        _c.data["g16_t_gibbs"] = _c.data["g16_corr_to_gibbs"] + _c.data["g16_scf"]
-        _c.energy = Units.hartree(_c.data["g16_t_gibbs"]).to_kcal_mol
+def calc_sum_energy(box: BoxCore):
+    for c in box.get():
+        c.data["g16_t_zero"] = c.data["g16_zpc"] + c.data["g16_scf"]
+        c.data["g16_t_energy"] = c.data["g16_corr_to_energy"] + c.data["g16_scf"]
+        c.data["g16_t_enthalpy"] = c.data["g16_corr_to_enthalpy"] + c.data["g16_scf"]
+        c.data["g16_t_gibbs"] = c.data["g16_corr_to_gibbs"] + c.data["g16_scf"]
+        c.energy = Units.hartree(c.data["g16_t_gibbs"]).to_kcal_mol
 
 
-def read_low_freqs(mulcos: BoxCore):
-    for _c in mulcos.get():
-        with _c.path.open() as f:
-            _ls = f.readlines()
-        for i, _l in enumerate(_ls):
-            if "1                      2                      3" in _l:
-                _freq = [float(_ls[i + 2].split()[k]) for k in range(2, 5)]
-                _c.data["g16_freq_1"] = _freq[0]
-                _c.data["g16_freq_2"] = _freq[1]
-                _c.data["g16_freq_3"] = _freq[2]
+def read_low_freqs(box: BoxCore):
+    for c in box.get():
+        with c.path.open() as f:
+            ls = f.readlines()
+        for i, l_ in enumerate(ls):
+            if "1                      2                      3" in l_:
+                freq = [float(ls[i + 2].split()[k]) for k in range(2, 5)]
+                c.data["g16_freq_1"] = freq[0]
+                c.data["g16_freq_2"] = freq[1]
+                c.data["g16_freq_3"] = freq[2]
 
 
-def read_vibration(mulcos: BoxCore, freq_number: int = 1):
-    for _c in mulcos.get():
-        _freq = []
-        with _c.path.open() as f:
-            _ls = f.readlines()
-        for i, _l in enumerate(_ls):
-            if "Frequencies --" in _l:
-                no_row = [int(s) for s in _ls[i - 2].split()]
+def read_vibration(box: BoxCore, freq_number: int = 1):
+    for c in box.get():
+        freq = []
+        with c.path.open() as f:
+            ls = f.readlines()
+        for i, line in enumerate(ls):
+            if "Frequencies --" in line:
+                no_row = [int(s) for s in ls[i - 2].split()]
                 if freq_number in no_row:
                     column_no = no_row.index(freq_number)
-                    for k, _l2 in enumerate(_ls[i:]):
-                        if "Atom" in _l2:
+                    for k, l_following in enumerate(ls[i:]):
+                        if "Atom" in l_following:
                             row_no = i + k + 1
                             break
-        for _l in _ls[row_no:]:
-            if len(_l.split()) in [3, 0, 1]:
+        for line in ls[row_no:]:
+            if len(line.split()) in [3, 0, 1]:
                 break
-            _freq.append(_l.split()[2 + column_no * 3 : 2 + (column_no + 1) * 3])
-        _c.data["g16_vibration"] = _freq
+            freq.append(line.split()[2 + column_no * 3 : 2 + (column_no + 1) * 3])
+        c.data["g16_vibration"] = freq
 
 
 def check_bonding(
-    mulcos: BoxCore,
+    box: BoxCore,
     bonding_atoms: list[int],
     additional_valid_range: int = 0,
     acceptable_invalid_atoms: int = 0,
 ):
-    for _c in mulcos.get():
-        _dists = []
-        for i, _v in enumerate(_c.data["g16_vibration"]):
-            _dists.append([i + 1, np.linalg.norm(np.array(_v))])
-        _rank = [_dist[0] for _dist in sorted(_dists, reverse=True, key=lambda x: x[1])]
-        logger.debug(f"vib_rank: {_rank}")
+    for c in box.get():
+        distances = []
+        for i, vib in enumerate(c.data["g16_vibration"]):
+            distances.append([i + 1, np.linalg.norm(np.array(vib))])
+        rank = [distance[0] for distance in sorted(distances, reverse=True, key=lambda x: x[1])]
+        logger.debug(f"vib_rank: {rank}")
         invalid_atoms = []
-        for _atom in bonding_atoms:
+        for a in bonding_atoms:
             valid_range = len(bonding_atoms) + additional_valid_range
-            _atom_rank = _rank.index(_atom) + 1
-            logger.debug(f"the rank of atom {_atom} was {_atom_rank}: {_c.path.name}")
-            if _atom_rank <= valid_range:
-                logger.debug(f"the rank of atom {_atom} was in valid range")
+            atom_rank = rank.index(a) + 1
+            logger.debug(f"the rank of atom {a} was {atom_rank}: {c.path.name}")
+            if atom_rank <= valid_range:
+                logger.debug(f"the rank of atom {a} was in valid range")
             else:
-                logger.info(f"the rank of atom {_atom} was in invalid range")
-                invalid_atoms.append(_atom)
+                logger.info(f"the rank of atom {a} was in invalid range")
+                invalid_atoms.append(a)
         if len(invalid_atoms) > acceptable_invalid_atoms:
             logger.info(f"atoms {invalid_atoms} are out of range")
-            _c.state = False
+            c.state = False
 
 
-def read_nmr(mulcos: BoxCore):
-    for _c in mulcos.get():
-        with _c.path.open() as f:
-            _ls = f.readlines()
-        for i, _l in enumerate(_ls):
-            if "Anisotropy =" in _l:
-                _lsp = _l.split()
-                _a = _c.atoms.get(int(_lsp[0]))
-                if _a.symbol != Elements.canonicalize(_lsp[1]):
+def read_nmr(box: BoxCore):
+    for c in box.get():
+        with c.path.open() as f:
+            ls = f.readlines()
+        for line in ls:
+            if "Anisotropy =" in line:
+                splitted_line = line.split()
+                a = c.atoms.get(int(splitted_line[0]))
+                if a.symbol != Elements.canonicalize(splitted_line[1]):
                     logger.error("atomic symbol does not matched")
                     break
                 else:
-                    _a.data["isotropic"] = float(_l.split()[4])
-                    _a.data["anisotropy"] = float(_l.split()[7])
+                    a.data["isotropic"] = float(line.split()[4])
+                    a.data["anisotropy"] = float(line.split()[7])
 
 
 def read_ecd(box: BoxCore):
-    for _c in box.get():
-        with _c.path.open() as f:
-            _ls = f.readlines()
-        _stat_dict = defaultdict(dict)
-        for i, _l in enumerate(_ls):
-            if "Excited State" in _l:
-                _lsp = _l.split()
-                _d = _stat_dict[int(_lsp[2].replace(":", ""))]
-                _d["shape"] = _lsp[3]
-                _d["energy"] = float(_lsp[4])
-                _d["length"] = float(_lsp[6])
-                _d["f"] = float(_lsp[8][2:])
-                _d["S2"] = float(_lsp[9][7:])
-            if "R(velocity)" in _l:
-                for _li in _ls[i + 1 :]:
-                    if "rxdel" in _li:
+    for c in box.get():
+        with c.path.open() as f:
+            ls = f.readlines()
+        state_dicts = defaultdict(dict)
+        for i, line in enumerate(ls):
+            if "Excited State" in line:
+                splitted_line = line.split()
+                d = state_dicts[int(splitted_line[2].replace(":", ""))]
+                d["shape"] = splitted_line[3]
+                d["energy"] = float(splitted_line[4])
+                d["length"] = float(splitted_line[6])
+                d["f"] = float(splitted_line[8][2:])
+                d["S2"] = float(splitted_line[9][7:])
+            if "R(velocity)" in line:
+                for l_following in ls[i + 1 :]:
+                    if "rxdel" in l_following:
                         break
-                    _stat_dict[int(_li.split()[0])]["R_velocity"] = float(_li.split()[4])
-            if "R(length)" in _l:
-                for _li in _ls[i + 1 :]:
-                    if "del" in _li:
+                    state_dicts[int(l_following.split()[0])]["R_velocity"] = float(l_following.split()[4])
+            if "R(length)" in line:
+                for l_following in ls[i + 1 :]:
+                    if "del" in l_following:
                         break
-                    _stat_dict[int(_li.split()[0])]["R_length"] = float(_li.split()[4])
-        _c.data["ecd"] = dict(_stat_dict)
+                    state_dicts[int(l_following.split()[0])]["R_length"] = float(l_following.split()[4])
+        c.data["ecd"] = dict(state_dicts)
 
 
-def read_spinspin(mulcos: BoxCore, key_value: str = "Total_J"):
+def read_spinspin(box: BoxCore, key_value: str = "Total_J"):
     """
     key_value
     'FC_to_K': Fermi Contact (FC) contribution to K (Hz)
@@ -144,7 +143,7 @@ def read_spinspin(mulcos: BoxCore, key_value: str = "Total_J"):
     'Total_K': Total nuclear spin-spin coupling K (Hz)
     'Total_J': Total nuclear spin-spin coupling J (Hz)
     """
-    _key_list = {
+    key_dict = {
         "FC_to_K": "Fermi Contact (FC) contribution to K (Hz):",
         "FC_to_J": "Fermi Contact (FC) contribution to J (Hz):",
         "SC_to_K": "Spin-dipolar (SD) contribution to K (Hz):",
@@ -156,68 +155,69 @@ def read_spinspin(mulcos: BoxCore, key_value: str = "Total_J"):
         "Total_K": "Total nuclear spin-spin coupling K (Hz):",
         "Total_J": "Total nuclear spin-spin coupling J (Hz):",
     }
-    _key_str = _key_list[key_value]
-    logger.info(f"{_key_str[:-1]} is used for extracting coupling data")
-    for _c in mulcos.get():
-        with _c.path.open() as f:
-            _ls = f.readlines()
-        for i, _l in enumerate(_ls):
-            if _key_str in _l:
-                for _a in _c.atoms:
-                    _a.data["coupling"] = {}
+    key_string = key_dict[key_value]
+    logger.info(f"{key_string[:-1]} is used for extracting coupling data")
+    for c in box.get():
+        with c.path.open() as f:
+            ls = f.readlines()
+        for i, line in enumerate(ls):
+            if key_string in line:
+                for a in c.atoms:
+                    a.data["coupling"] = {}
                 col_idx = []
-                for _ll in _ls[i + 1 :]:
-                    if not _ll.split()[0].isdecimal():
+                for l_following in ls[i + 1 :]:
+                    if not l_following.split()[0].isdecimal():
                         break
-                    elif _ll.startswith("            "):
-                        col_idx = [int(k) for k in _ll.split()]
+                    elif l_following.startswith("            "):
+                        col_idx = [int(k) for k in l_following.split()]
                     else:
-                        for k, _jvalue in enumerate(_ll.split()[1:]):
-                            _jvalue = float(_jvalue.replace("D", "E"))
-                            _c.atoms.get(int(_ll.split()[0]) + 1).data["coupling"][col_idx[k]] = _jvalue
-                            _c.atoms.get(col_idx[k] + 1).data["coupling"][int(_ll.split()[0])] = _jvalue
+                        for k, j_value in enumerate(l_following.split()[1:]):
+                            j_value = float(j_value.replace("D", "E"))
+                            c.atoms.get(int(l_following.split()[0]) + 1).data["coupling"][col_idx[k]] = j_value
+                            c.atoms.get(col_idx[k] + 1).data["coupling"][int(l_following.split()[0])] = j_value
 
 
-def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
-    def _gen_gjf_from_final_stdorient(_p: Path):
-        with _p.open() as f:
-            _ls = f.readlines()
-        geom_no = 0
-        for i, _l in enumerate(_ls):
-            if "Standard orientation:" in _l:
-                geom_no = i
-        if geom_no == 0:
-            logger.error("could not find Standard orientation entry: " + _p.name)
+def check_resub(box: BoxCore, input_suffix=".gjf", log_suffix=".log"):
+    def _gen_gjf_from_final_stdorient(p: Path):
+        with p.open() as f:
+            ls = f.readlines()
+        geometory_position = 0
+        for i, line in enumerate(ls):
+            if "Standard orientation:" in line:
+                geometory_position = i
+        if geometory_position == 0:
+            logger.error("could not find Standard orientation entry: " + p.name)
             return False
-        geom = []
-        for _l in _ls[(geom_no + 5) :]:
-            if "---------------------------------------------------------------------" in _l:
+        geometories = []
+        for line in ls[(geometory_position + 5) :]:
+            if "---------------------------------------------------------------------" in line:
                 break
-            geom.append(_l.split())
-        geom = [
-            "{1:<2} {0[3]:>11} {0[4]:>11} {0[5]:>11}\n".format(_g, Elements.canonicalize(int(_g[1]))) for _g in geom
+            geometories.append(line.split())
+        geometories = [
+            "{1:<2} {0[3]:>11} {0[4]:>11} {0[5]:>11}\n".format(g, Elements.canonicalize(int(g[1])))
+            for g in geometories
         ]
 
-        with _p.with_suffix(input_suffix).open() as f:
-            _gjf_ls = f.readlines()
-        blank_line_index = [i for i, _gjf_l in enumerate(_gjf_ls) if _gjf_l == "\n"]
-        _out_lines = _gjf_ls[0 : blank_line_index[1] + 2]
-        _out_lines.extend(geom)
-        _out_lines.extend(_gjf_ls[blank_line_index[2] :])
+        with p.with_suffix(input_suffix).open() as f:
+            gjf_ls = f.readlines()
+        blank_line_indexes = [i for i, gjf_line in enumerate(gjf_ls) if gjf_line == "\n"]
+        out_lines = gjf_ls[0 : blank_line_indexes[1] + 2]
+        out_lines.extend(geometories)
+        out_lines.extend(gjf_ls[blank_line_indexes[2] :])
 
-        _suffix = "_"
-        for _ext in [input_suffix, log_suffix, ".chk"]:
-            while _p.with_suffix(_ext + _suffix).exists():
-                _suffix = _suffix + "_"
+        suffix = "_"
+        for ext_ in [input_suffix, log_suffix, ".chk"]:
+            while p.with_suffix(ext_ + suffix).exists():
+                suffix = suffix + "_"
 
-        for _ext in [input_suffix, log_suffix, ".chk"]:
-            if _p.with_suffix(_ext).exists():
-                _p.with_suffix(_ext).rename(_p.with_suffix(_ext + _suffix))
-                logger.debug(f"{_p.with_suffix(_ext).name} was renamed as {_p.with_suffix(_ext + _suffix).name}")
+        for ext_ in [input_suffix, log_suffix, ".chk"]:
+            if p.with_suffix(ext_).exists():
+                p.with_suffix(ext_).rename(p.with_suffix(ext_ + suffix))
+                logger.debug(f"{p.with_suffix(ext_).name} was renamed as {p.with_suffix(ext_ + suffix).name}")
 
-        with _p.with_suffix(input_suffix).open("w") as f:
-            f.writelines(_out_lines)
-        logger.debug(f"{_p.with_suffix(input_suffix).name} was generated")
+        with p.with_suffix(input_suffix).open("w") as f:
+            f.writelines(out_lines)
+        logger.debug(f"{p.with_suffix(input_suffix).name} was generated")
         return True
 
     class Gerr:
@@ -227,16 +227,16 @@ def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
             self.resub = resub
             self.use_final_geom = use_final_geom
 
-        def resolve(self, conf: System):
-            logger.info(f"{_c.name}: {self.name} was detected")
+        def resolve(self, c: System):
+            logger.info(f"{c.name}: {self.name} was detected")
             if self.resub:
                 if self.use_final_geom:
-                    if _gen_gjf_from_final_stdorient(conf.path.with_suffix(log_suffix)):
-                        conf.data["resubmission"] = True
+                    if _gen_gjf_from_final_stdorient(c.path.with_suffix(log_suffix)):
+                        c.data["resubmission"] = True
                     else:
                         return False
                 else:
-                    conf.data["resubmission"] = True
+                    c.data["resubmission"] = True
             return True
 
     no_log_err = Gerr("no log file error", use_final_geom=False)
@@ -262,9 +262,9 @@ def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
         Gerr("FormBX problem", statement="FormBX had a problem"),
     ]
 
-    for _c in mulcos.get():
-        _c.data["resubmission"] = False
-        with _c.path.with_suffix(input_suffix).open("r") as f:
+    for c in box.get():
+        c.data["resubmission"] = False
+        with c.path.with_suffix(input_suffix).open("r") as f:
             gjf_ls = f.readlines()
         tot_jobs = 1
         for i, gjf_l in enumerate(gjf_ls):
@@ -273,9 +273,9 @@ def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
             if "freq" in gjf_l.lower() and "opt" in gjf_l.lower():
                 tot_jobs += 1
 
-        log_p = _c.path.with_suffix(log_suffix)
+        log_p = c.path.with_suffix(log_suffix)
         if not log_p.exists():
-            no_log_err.resolve(_c)
+            no_log_err.resolve(c)
             continue
 
         norm_term = 0
@@ -302,18 +302,18 @@ def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
                             break
                 if len(rms_force_vs) < 12:
                     logger.error("not enough force entries (less than 12) to detect vibration")
-                    link9999_err.resolve(_c)
+                    link9999_err.resolve(c)
                 elif (statistics.stdev(rms_force_vs[-12::2]) < 0.000001) or (
                     statistics.stdev(rms_force_vs[-12::3]) < 0.000001
                 ):
-                    link9999_w_vib.resolve(_c)
+                    link9999_w_vib.resolve(c)
                 else:
-                    link9999_wo_vib.resolve(_c)
+                    link9999_wo_vib.resolve(c)
                 err_flag = True
                 break
             for _e in normal_errs:
                 if _e.statement in log_l:
-                    _e.resolve(_c)
+                    _e.resolve(c)
                     err_flag = True
                     break
             else:
@@ -322,22 +322,22 @@ def check_resub(mulcos: BoxCore, input_suffix=".gjf", log_suffix=".log"):
 
         if not err_flag:
             if norm_term == tot_jobs:
-                logger.debug(f"{_c.name} terminated normally")
+                logger.debug(f"{c.name} terminated normally")
             else:
-                unknown_err.resolve(_c)
-                logger.error(f"{_c.name}: unknown termination was detected")
+                unknown_err.resolve(c)
+                logger.error(f"{c.name}: unknown termination was detected")
 
-    if len(mulcos.get().has_data("resubmission", True)) == 0:
+    if len(box.get().has_data("resubmission", True)) == 0:
         logger.info("There is no resubmission")
 
 
 @FileType.add("app/g16/input", 30)
-def is_g16_input(_p: Path) -> bool:
-    if _p.suffix not in (".gjf", ".com", ".inp"):
+def is_g16_input(p: Path) -> bool:
+    if p.suffix not in (".gjf", ".com", ".inp"):
         return False
 
     route_pass = False
-    with _p.open() as _f:
+    with p.open() as _f:
         for _i, _l in enumerate(_f):
             if _l.startswith("%") and not route_pass:
                 continue
@@ -354,38 +354,38 @@ def is_g16_input(_p: Path) -> bool:
 
 
 @FileType.add("app/g16/output", 50)
-def is_g16_output(_p: Path) -> bool:
-    if _p.suffix not in (".log", ".out", ".g16", ".g09", ".g98"):
+def is_g16_output(p: Path) -> bool:
+    if p.suffix not in (".log", ".out", ".g16", ".g09", ".g98"):
         return False
-    with _p.open() as _f:
-        for _i, _l in enumerate(_f):
-            if "Entering Gaussian System" in _l:
+    with p.open() as f:
+        for i, line in enumerate(f):
+            if "Entering Gaussian System" in line:
                 return True
-            if _i > 100:
+            if i > 100:
                 break
     return False
 
 
-def run(_c: System):
-    _cmd = [Execmd.get("g16"), str(_c.path.resolve().absolute())]
+def run(c: System):
+    cmd = [Execmd.get("g16"), str(c.path.resolve().absolute())]
     try:
-        logger.info(f"running: {_c.name}: {''.join(_cmd)}")
-        _proc = subprocess.run(_cmd, cwd=str(_c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        _out = _proc.stdout.decode("utf-8").split("\n")
-        logger.info(f"finished: {_c.name}: {_out}")
+        logger.info(f"running: {c.name}: {''.join(cmd)}")
+        proc = subprocess.run(cmd, cwd=str(c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _out = proc.stdout.decode("utf-8").split("\n")
+        logger.info(f"finished: {c.name}: {_out}")
     except subprocess.CalledProcessError:
-        _c.state = False
-        logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
+        c.state = False
+        logger.error(f"failed: {c.name}: {''.join(cmd)}")
 
 
-def submit(_c: System):
-    _cmd = [Execmd.get("g16"), str(_c.path.resolve().absolute())]
+def submit(c: System):
+    cmd = [Execmd.get("g16"), str(c.path.resolve().absolute())]
     try:
-        subprocess.Popen(_cmd, cwd=str(_c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        logger.info(f"submited: {_c.name}: {''.join(_cmd)}")
+        subprocess.Popen(cmd, cwd=str(c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        logger.info(f"submited: {c.name}: {''.join(cmd)}")
     except subprocess.CalledProcessError:
-        _c.state = False
-        logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
+        c.state = False
+        logger.error(f"failed: {c.name}: {''.join(cmd)}")
 
 
 class GauBox(BoxCore):
@@ -394,31 +394,31 @@ class GauBox(BoxCore):
         """
         source = 'archive' | 'standard_orientation' | 'input_orientation'
         """
-        for _c in self.get():
-            with _c.path.open() as f:
-                _ls = f.readlines()
+        for c in self.get():
+            with c.path.open() as f:
+                ls = f.readlines()
 
             if source == "archive":
                 arc_sec = ""
-                for i, _l in enumerate(_ls):
-                    if "1\\1\\" in _l:
+                for i, line in enumerate(ls):
+                    if "1\\1\\" in line:
                         arc_sec = ""
-                        for _l in _ls[i:]:
-                            arc_sec += "".join(_l[1:].splitlines())
-                            if "\\\\@" in _l:
+                        for line in ls[i:]:
+                            arc_sec += "".join(line[1:].splitlines())
+                            if "\\\\@" in line:
                                 break
                 if arc_sec == "":
-                    logger.error(f"could not find archive section in {_c.path.name}")
-                    _c.deactivate("read_atoms: g16")
+                    logger.error(f"could not find archive section in {c.path.name}")
+                    c.deactivate("read_atoms: g16")
                     continue
                 arc_sec = arc_sec.split("\\\\")
-                _axyz = [i.split(",") for i in arc_sec[3].split("\\")[1:]]
-                if len(_axyz[0]) == 5:
-                    for _l in _axyz:
-                        _l.pop(1)
-                elif len(_axyz[0]) == 1:
-                    logger.error(f"could not resolve archive section in {_c.path.name}")
-                    _c.deactivate("read_atoms: g16")
+                axyzs = [i.split(",") for i in arc_sec[3].split("\\")[1:]]
+                if len(axyzs[0]) == 5:
+                    for line in axyzs:
+                        line.pop(1)
+                elif len(axyzs[0]) == 1:
+                    logger.error(f"could not resolve archive section in {c.path.name}")
+                    c.deactivate("read_atoms: g16")
                     continue
 
             elif source in ("standard_orientation", "input_orientation"):
@@ -427,156 +427,156 @@ class GauBox(BoxCore):
                     "input_orientation": "Input orientation:",
                 }
                 line_number = 0
-                for i, _l in enumerate(_ls):
-                    if key_words[source] in _l:
+                for i, line in enumerate(ls):
+                    if key_words[source] in line:
                         line_number = i
                 if line_number == 0:
-                    logger.error(f"could not find orientation section in {_c.path.name}")
-                    _c.deactivate("read_atoms: g16")
+                    logger.error(f"could not find orientation section in {c.path.name}")
+                    c.deactivate("read_atoms: g16")
                     continue
-                _axyz = []
-                for _l in _ls[(line_number + 5) :]:
-                    if "---------------------------------------------------------------------" in _l:
+                axyzs = []
+                for line in ls[(line_number + 5) :]:
+                    if "---------------------------------------------------------------------" in line:
                         break
-                    _axyz.append(_l.split())
-                _axyz = [[Elements.canonicalize(int(_l[1])), _l[3], _l[4], _l[5]] for _l in _axyz]
+                    axyzs.append(line.split())
+                axyzs = [[Elements.canonicalize(int(axyz[1])), axyz[3], axyz[4], axyz[5]] for axyz in axyzs]
 
-            _c.atoms.clear()
-            for _l in _axyz:
-                _c.atoms.append(_l)
-            logger.debug(f"read xyz of {_c.path.name} from {source}")
+            c.atoms.clear()
+            for line in axyzs:
+                c.atoms.append(line)
+            logger.debug(f"read xyz of {c.path.name} from {source}")
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_atoms.add("app/g16/input")
     def read_atoms_from_input(self):
-        for _c in self.get():
-            with _c.path.open() as f:
-                _ls = f.readlines()
+        for c in self.get():
+            with c.path.open() as f:
+                ls = f.readlines()
             blank_line_count = 0
             atomic_coord = []
-            for i, _l in enumerate(_ls):
+            for line in ls:
                 if blank_line_count == 2:
-                    atomic_coord.append(_l.replace(",", " ").replace("/", " ").replace("\t", " ").split())
+                    atomic_coord.append(line.replace(",", " ").replace("/", " ").replace("\t", " ").split())
                 elif blank_line_count == 3:
                     break
-                if _l == "\n":
+                if line == "\n":
                     blank_line_count += 1
             chg_mult = atomic_coord.pop(0)
             atomic_coord.pop()
             try:
                 if len(chg_mult) != 2:
                     raise ValueError
-                _c.total_charge = int(chg_mult[0])
-                _c.multiplicity = int(chg_mult[1])
+                c.total_charge = int(chg_mult[0])
+                c.multiplicity = int(chg_mult[1])
                 uni_len = list({len(_l) for _l in atomic_coord})
                 if len(uni_len) != 1 or uni_len[0] != 4:
                     logger.error("currently cannot read Z-matrix")
                     raise ValueError
-                _c.atoms.clear()
-                _c.atoms.extend(atomic_coord)
+                c.atoms.clear()
+                c.atoms.extend(atomic_coord)
             except ValueError:
-                _c.deactivate("read_atoms: g16")
-                logger.error(f"could not read coordinate of {_c.path.name}")
+                c.deactivate("read_atoms: g16")
+                logger.error(f"could not read coordinate of {c.path.name}")
                 continue
             else:
-                logger.debug(f"read atoms of {_c.path.name}")
+                logger.debug(f"read atoms of {c.path.name}")
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_energy.add("app/g16/output")
     def read_scf(self, calculation_method: str = None):
-        for _c in self.get():
+        for c in self.get():
             if calculation_method is None:
                 scf_key = "SCF Done:"
             else:
                 scf_key = "SCF Done:  E(" + calculation_method + ")"
                 logger.info(f"{scf_key} is used for search SCF")
-            with _c.path.open() as f:
-                _ls = f.readlines()
-            _n = 0
-            for i, _l in enumerate(_ls):
-                if scf_key in _l:
-                    _n = i
-            if _n == 0:
+            with c.path.open() as f:
+                ls = f.readlines()
+            position_num = 0
+            for i, line in enumerate(ls):
+                if scf_key in line:
+                    position_num = i
+            if position_num == 0:
                 logger.error("could not find the scf entry")
-                _c.deactivate("read_scf")
+                c.deactivate("read_scf")
                 continue
-            _c.data["g16_scf"] = float(_ls[_n].split()[4])
-            _c.energy = Units.hartree(_c.data["g16_scf"]).to_kcal_mol
+            c.data["g16_scf"] = float(ls[position_num].split()[4])
+            c.energy = Units.hartree(c.data["g16_scf"]).to_kcal_mol
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_thermal.add("app/g16/output")
     def read_thermal(self):
-        for _c in self.get():
-            with _c.path.open() as f:
-                _ls = f.readlines()
-            for i, _l in enumerate(_ls):
-                if "Zero-point correction" in _l:
-                    _c.data["g16_zpc"] = float(_ls[i].split()[2])
-                if "Thermal correction to Energy" in _l:
-                    _c.data["g16_corr_to_energy"] = float(_ls[i].split()[4])
-                if "Thermal correction to Enthalpy" in _l:
-                    _c.data["g16_corr_to_enthalpy"] = float(_ls[i].split()[4])
-                if "Thermal correction to Gibbs Free Energy" in _l:
-                    _c.data["g16_corr_to_gibbs"] = float(_ls[i].split()[6])
+        for c in self.get():
+            with c.path.open() as f:
+                ls = f.readlines()
+            for i, line in enumerate(ls):
+                if "Zero-point correction" in line:
+                    c.data["g16_zpc"] = float(ls[i].split()[2])
+                if "Thermal correction to Energy" in line:
+                    c.data["g16_corr_to_energy"] = float(ls[i].split()[4])
+                if "Thermal correction to Enthalpy" in line:
+                    c.data["g16_corr_to_enthalpy"] = float(ls[i].split()[4])
+                if "Thermal correction to Gibbs Free Energy" in line:
+                    c.data["g16_corr_to_gibbs"] = float(ls[i].split()[6])
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.check_end.add("app/g16/output")
     def check_end(self, input_suffix: str = ".gjf"):
-        for _c in self.get():
-            if _c.path.with_suffix(input_suffix).exists():
-                with _c.path.with_suffix(input_suffix).open("r") as f:
-                    _gjf_ls = f.readlines()
-                _tot_jobs = 1
-                for i, _gjf_l in enumerate(_gjf_ls):
-                    if "--link1--" in _gjf_l.lower():
-                        _tot_jobs += 1
-                    if "freq" in _gjf_l.lower() and "opt" in _gjf_l.lower():
-                        _tot_jobs += 1
-                with _c.path.open() as f:
-                    _ls = f.readlines()
-                for _l in _ls:
-                    if "Normal termination" in _l:
-                        _tot_jobs -= 1
-                if _tot_jobs == 0:
-                    logger.debug(f"{_c.path.name} was terminated normally")
+        for c in self.get():
+            if c.path.with_suffix(input_suffix).exists():
+                with c.path.with_suffix(input_suffix).open("r") as f:
+                    gjf_ls = f.readlines()
+                total_jobs_num = 1
+                for gjf_l in gjf_ls:
+                    if "--link1--" in gjf_l.lower():
+                        total_jobs_num += 1
+                    if "freq" in gjf_l.lower() and "opt" in gjf_l.lower():
+                        total_jobs_num += 1
+                with c.path.open() as f:
+                    ls = f.readlines()
+                for line in ls:
+                    if "Normal termination" in line:
+                        total_jobs_num -= 1
+                if total_jobs_num == 0:
+                    logger.debug(f"{c.path.name} was terminated normally")
                 else:
-                    logger.info(f"{_c.path.name} was NOT terminated normally")
-                    _c.deactivate("check_end")
+                    logger.info(f"{c.path.name} was NOT terminated normally")
+                    c.deactivate("check_end")
             else:
-                logger.debug(f"{_c.path.name}: could not find input: check if Normal termination is in last 10 lines")
-                with _c.path.open() as f:
-                    _ls = f.readlines()
-                for _l in _ls[-10:]:
-                    if "Normal termination" in _l:
-                        logger.debug(f"{_c.path.name} was terminated normally")
+                logger.debug(f"{c.path.name}: could not find input: check if Normal termination is in last 10 lines")
+                with c.path.open() as f:
+                    ls = f.readlines()
+                for line in ls[-10:]:
+                    if "Normal termination" in line:
+                        logger.debug(f"{c.path.name} was terminated normally")
                         break
                 else:
-                    logger.info(f"{_c.path.name} was NOT terminated normally")
-                    _c.deactivate("check_end")
+                    logger.info(f"{c.path.name} was NOT terminated normally")
+                    c.deactivate("check_end")
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.check_freq.add("app/g16/output")
     def check_freq(self, im: int = 0):
-        for _c in self.get():
-            _freq = []
-            with _c.path.open() as f:
-                _ls = f.readlines()
-            for i, _l in enumerate(_ls):
-                if "1                      2                      3" in _l:
-                    _freq = [float(_ls[i + 2].split()[k]) for k in range(2, 5)]
-                    _c.data["g16_img_freq"] = len([_fr for _fr in _freq if _fr < 0])
-                    if im != _c.data["g16_img_freq"]:
+        for c in self.get():
+            freqs = []
+            with c.path.open() as f:
+                ls = f.readlines()
+            for i, line in enumerate(ls):
+                if "1                      2                      3" in line:
+                    freqs = [float(ls[i + 2].split()[k]) for k in range(2, 5)]
+                    c.data["g16_img_freq"] = len([freq for freq in freqs if freq < 0])
+                    if im != c.data["g16_img_freq"]:
                         logger.info(
-                            "number of imaginary frequency of {} was {}".format(_c.name, _c.data["g16_img_freq"])
+                            "number of imaginary frequency of {} was {}".format(c.name, c.data["g16_img_freq"])
                         )
-                        _c.deactivate("check_freq")
-            if _freq == []:
-                logger.error(f"could not find frequency in {_c.path.name}")
+                        c.deactivate("check_freq")
+            if freqs == []:
+                logger.error(f"could not find frequency in {c.path.name}")
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -625,29 +625,29 @@ class GauBox(BoxCore):
         return self.calc_energy(keys=keys, unit=unit)
 
     def is_input(self):
-        for _c in self.get():
-            if not is_g16_input(_c.path):
-                _c.state = False
+        for c in self.get():
+            if not is_g16_input(c.path):
+                c.state = False
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_output(self):
-        for _c in self.get():
-            if not is_g16_output(_c.path):
-                _c.state = False
+        for c in self.get():
+            if not is_g16_output(c.path):
+                c.state = False
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.run.add("app/g16/input")
     def run(self):
-        for _c in self.get():
-            run(_c)
+        for c in self.get():
+            run(c)
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.submit.add("app/g16/input")
     def submit(self):
-        for _c in self.get():
-            submit(_c)
+        for c in self.get():
+            submit(c)
         logger.debug(f"done: {str(self)}")
         return self

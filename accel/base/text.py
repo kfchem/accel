@@ -5,17 +5,17 @@ from accel.base.tools import change_dir, float_to_str
 from accel.util.log import logger
 
 
-def replace_key(conf: System, lines: list[str]):
-    _rls = "".join(lines)
+def replace_key(system: System, lines: list[str]):
+    rls = "".join(lines)
     while True:
-        if "#NAME#" in _rls:
-            _rls = _rls.replace("#NAME#", conf.name)
+        if "#NAME#" in rls:
+            rls = rls.replace("#NAME#", system.name)
             continue
-        if "#DATA[" in _rls:
-            key = _rls.split("#DATA[")[1].split("]#")[0]
-            _rls = _rls.replace("#DATA[" + key + "]#", conf.data[key])
+        if "#DATA[" in rls:
+            key = rls.split("#DATA[")[1].split("]#")[0]
+            rls = rls.replace("#DATA[" + key + "]#", system.data[key])
             continue
-        if "#AXYZ#" in _rls:
+        if "#AXYZ#" in rls:
             _xyz = [
                 "{:<2} {:>15} {:>15} {:>15}".format(
                     _a.symbol,
@@ -23,60 +23,60 @@ def replace_key(conf: System, lines: list[str]):
                     float_to_str(_a.y),
                     float_to_str(_a.z),
                 )
-                for _a in conf.atoms
+                for _a in system.atoms
             ]
-            _rls = _rls.replace("#AXYZ#", "\n".join(_xyz))
+            rls = rls.replace("#AXYZ#", "\n".join(_xyz))
             continue
-        if "#ATOMS#" in _rls:
-            _rls = _rls.replace("#ATOMS#", str(len(conf.atoms)))
+        if "#ATOMS#" in rls:
+            rls = rls.replace("#ATOMS#", str(len(system.atoms)))
             continue
-        if "#CHG#" in _rls:
-            _rls = _rls.replace("#CHG#", str(conf.charge))
+        if "#CHG#" in rls:
+            rls = rls.replace("#CHG#", str(system.charge))
             continue
-        if "#MULT#" in _rls:
-            _rls = _rls.replace("#MULT#", str(conf.multiplicity))
+        if "#MULT#" in rls:
+            rls = rls.replace("#MULT#", str(system.multiplicity))
             continue
-        if "#ENRGY#" in _rls:
-            _rls = _rls.replace("#ENRGY#", str(conf.energy))
+        if "#ENRGY#" in rls:
+            rls = rls.replace("#ENRGY#", str(system.energy))
             continue
-        if "#PATH#" in _rls:
-            _rls = _rls.replace("#PATH#", str(conf.path))
+        if "#PATH#" in rls:
+            rls = rls.replace("#PATH#", str(system.path))
             continue
-        if "#LABEL#" in _rls:
-            _rls = _rls.replace("#LABEL#", str(conf.label))
+        if "#LABEL#" in rls:
+            rls = rls.replace("#LABEL#", str(system.label))
             continue
         break
-    _rls = [_l + "\n" for _l in _rls.split("\n")]
-    return _rls[:-1]
+    rls = [_l + "\n" for _l in rls.split("\n")]
+    return rls[:-1]
 
 
-def replace_arg(conf: System, lines: list[str], arg: dict[str, str]):
-    _rls = "".join(lines)
+def replace_arg(system: System, lines: list[str], arg: dict[str, str]):
+    rls = "".join(lines)
     while True:
         for key, val in arg.items():
-            if f"#{key}#" in _rls:
-                _rls = _rls.replace(f"#{key}#", val)
+            if f"#{key}#" in rls:
+                rls = rls.replace(f"#{key}#", val)
                 break
         else:
             break
-    _rls = [_l + "\n" for _l in _rls.split("\n")]
-    return _rls[:-1]
+    rls = [_l + "\n" for _l in rls.split("\n")]
+    return rls[:-1]
 
 
-def write_input(_c: System, template: Path, odir=None, link=False, arg: dict[str, str] = None):
-    _tp = Path(template).resolve()
-    if not _tp.exists():
-        logger.error(f"{str(_tp)} not exist")
+def write_input(system: System, template: Path, odir=None, link=False, arg: dict[str, str] = None):
+    tp = Path(template).resolve()
+    if not tp.exists():
+        logger.error(f"{str(tp)} not exist")
         raise ValueError
-    with _tp.open("r") as f:
-        _ls = f.readlines()
-    _ls = replace_key(_c, _ls)
+    with tp.open("r") as f:
+        ls = f.readlines()
+    ls = replace_key(system, ls)
     if arg is not None:
         arg = {str(_k): str(_v) for _k, _v in arg.items()}
-        _ls = replace_arg(_c, _ls, arg)
-    _p = change_dir(_c.path, odir, _c.name).with_suffix(_tp.suffix)
-    with _p.open("w", newline="\n") as f:
-        f.writelines(_ls)
-    logger.info(f"{_p.name} created")
+        ls = replace_arg(system, ls, arg)
+    p = change_dir(system.path, odir, system.name).with_suffix(tp.suffix)
+    with p.open("w", newline="\n") as f:
+        f.writelines(ls)
+    logger.info(f"{p.name} created")
     if link:
-        _c.path = _p
+        system.path = p

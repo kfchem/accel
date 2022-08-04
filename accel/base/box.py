@@ -13,15 +13,15 @@ def adaptive_function_caller(box: "Box", selector: FuncSelector, filetype, **opt
         try:
             selector(filetype, Box().bind(box.get()), **options)
         except ValueError:
-            for _c in box.get():
-                _c.deactivate("could not find an appropriate function")
+            for c in box.get():
+                c.deactivate("could not find an appropriate function")
     else:
         for ft, confs in box.get().filetypes.items():
             try:
                 selector(ft, Box().bind(confs), **options)
             except ValueError:
-                for _c in confs:
-                    _c.deactivate("could not find an appropriate function")
+                for c in confs:
+                    c.deactivate("could not find an appropriate function")
     logger.debug(f"done: {str(box)}")
 
 

@@ -9,43 +9,43 @@ from accel.util import Execmd, FileType
 from accel.util.log import logger
 
 
-def que_submit(_c: System):
+def que_submit(c: System):
     try:
-        _jid = subprocess.run([Execmd.get("qsub"), str(_c.path)], cwd=str(_c.path.parent), stdout=subprocess.PIPE)
-        _jid = _jid.stdout.decode("utf-8").replace("\n", "")
-        logger.info(f"qsub: {_c.path.name} was submitted")
+        joc_id = subprocess.run([Execmd.get("qsub"), str(c.path)], cwd=str(c.path.parent), stdout=subprocess.PIPE)
+        joc_id = joc_id.stdout.decode("utf-8").replace("\n", "")
+        logger.info(f"qsub: {c.path.name} was submitted")
     except subprocess.CalledProcessError:
-        _c.state = False
-        _jid = "Submission Error"
-        logger.error(f"qsub: failed submission of {_c.path.name}")
-    _c.data["jobid"] = _jid
+        c.state = False
+        joc_id = "Submission Error"
+        logger.error(f"qsub: failed submission of {c.path.name}")
+    c.data["jobid"] = joc_id
 
 
-def que_wait(mulcos: BoxCore, interval_time=10):
+def que_wait(box: BoxCore, interval_time=10):
     logger.info("qsub: waiting completion of tasks")
-    _jid_list = []
-    for _c in mulcos.get():
-        _jid_list.append(_c.data["jobid"])
-    while len(_jid_list) != 0:
+    job_ids = []
+    for c in box.get():
+        job_ids.append(c.data["jobid"])
+    while len(job_ids) != 0:
         time.sleep(interval_time)
-        _proc = subprocess.run([Execmd.get("qstat")], stdout=subprocess.PIPE)
-        _plist = _proc.stdout.decode("utf-8").split("\n")
-        _plist = [_l.split()[0] for _l in _plist[2:] if len(_l) != 0]
-        for _jid in _jid_list:
-            if not (_jid in _plist):
-                _jid_list.remove(_jid)
-                logger.info(f"Job ID {_jid} was completed")
+        proc = subprocess.run([Execmd.get("qstat")], stdout=subprocess.PIPE)
+        proc_list = proc.stdout.decode("utf-8").split("\n")
+        proc_list = [_l.split()[0] for _l in proc_list[2:] if len(_l) != 0]
+        for job_id in job_ids:
+            if not (job_id in proc_list):
+                job_ids.remove(job_id)
+                logger.info(f"Job ID {job_id} was completed")
 
 
 @FileType.add("app/pbs/jobscript", 50)
-def is_pbs_jobscript(_p: Path) -> bool:
-    if _p.suffix not in (".sh", ".qsh", ".qsub"):
+def is_pbs_jobscript(p: Path) -> bool:
+    if p.suffix not in (".sh", ".qsh", ".qsub"):
         return False
-    with _p.open() as _f:
-        for _i, _l in enumerate(_f):
-            if "#PBS" in _l:
+    with p.open() as f:
+        for i, line in enumerate(f):
+            if "#PBS" in line:
                 return True
-            if _i > 10:
+            if i > 10:
                 break
     return False
 
@@ -53,8 +53,8 @@ def is_pbs_jobscript(_p: Path) -> bool:
 class PbsBox(BoxCore):
     @Selectors.submit.add("app/pbs/jobscript")
     def submit(self):
-        for _c in self.get():
-            que_submit(_c)
+        for c in self.get():
+            que_submit(c)
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -65,8 +65,8 @@ class PbsBox(BoxCore):
 
     @Selectors.run.add("app/pbs/jobscript")
     def run(self):
-        for _c in self.get():
-            que_submit(_c)
+        for c in self.get():
+            que_submit(c)
         que_wait(self)
         logger.debug(f"done: {str(self)}")
         return self

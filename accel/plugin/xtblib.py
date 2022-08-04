@@ -6,31 +6,31 @@ from accel.util import FileType, Units
 from accel.util.log import logger
 
 
-def read_total_free_energy(mulcos: BoxCore):
-    for _c in mulcos.get():
-        with _c.path.open(encoding="utf-8") as f:
-            _ls = f.readlines()
-        _n = 0
-        for i, _l in enumerate(_ls):
-            if "TOTAL FREE ENERGY" in _l:
-                _n = i
-        if _n != 0:
-            logger.debug("xTB: {}: {}".format(_c.path.name, _ls[_n].replace("\n", "")))
-            _c.energy = Units.hartree(float(_ls[_n].split()[4])).to_kcal_mol
+def read_total_free_energy(box: BoxCore):
+    for c in box.get():
+        with c.path.open(encoding="utf-8") as f:
+            ls = f.readlines()
+        position_idx = 0
+        for i, line in enumerate(ls):
+            if "TOTAL FREE ENERGY" in line:
+                position_idx = i
+        if position_idx != 0:
+            logger.debug("xTB: {}: {}".format(c.path.name, ls[position_idx].replace("\n", "")))
+            c.energy = Units.hartree(float(ls[position_idx].split()[4])).to_kcal_mol
         else:
-            logger.error(f"xTB: {_c.path.name}: the energy entry was not found")
-            _c.state = False
+            logger.error(f"xTB: {c.path.name}: the energy entry was not found")
+            c.state = False
 
 
 @FileType.add("app/xtb/output", 50)
-def is_xtb_output(_p: Path) -> bool:
-    if _p.suffix not in (".log", ".out", ".xtb"):
+def is_xtb_output(p: Path) -> bool:
+    if p.suffix not in (".log", ".out", ".xtb"):
         return False
-    with _p.open() as _f:
-        for _i, _l in enumerate(_f):
-            if "|                           x T B                           |" in _l:
+    with p.open() as f:
+        for i, line in enumerate(f):
+            if "|                           x T B                           |" in line:
                 return True
-            if _i > 20:
+            if i > 20:
                 break
     return False
 
@@ -38,36 +38,36 @@ def is_xtb_output(_p: Path) -> bool:
 class XtbBox(BoxCore):
     @Selectors.check_end.add("app/xtb/output")
     def check_end(self):
-        for _c in self.get():
-            with _c.path.open(encoding="utf-8") as f:
-                _ls = f.readlines()
-            _flag = False
-            for _l in _ls:
-                if "normal termination of xtb" in _l:
-                    _flag = True
-            if _flag:
-                logger.debug(f"xTB: {_c.path.name} was terminated normally")
+        for c in self.get():
+            with c.path.open(encoding="utf-8") as f:
+                ls = f.readlines()
+            terminated_nomally = False
+            for line in ls:
+                if "normal termination of xtb" in line:
+                    terminated_nomally = True
+            if terminated_nomally:
+                logger.debug(f"xTB: {c.path.name} was terminated normally")
             else:
-                logger.info(f"xTB: {_c.path.name} was NOT terminated normally")
-                _c.deactivate("check_end")
+                logger.info(f"xTB: {c.path.name} was NOT terminated normally")
+                c.deactivate("check_end")
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_energy.add("app/xtb/output")
     def read_energy(self):
-        for _c in self.get():
-            with _c.path.open(encoding="utf-8") as f:
-                _ls = f.readlines()
-            _n = 0
-            for i, _l in enumerate(_ls):
-                if "TOTAL ENERGY" in _l:
-                    _n = i
-            if _n != 0:
-                logger.debug("xTB: {}: {}".format(_c.path.name, _ls[_n].replace("\n", "")))
-                _c.energy = Units.hartree(float(_ls[_n].split()[3])).to_kcal_mol
+        for c in self.get():
+            with c.path.open(encoding="utf-8") as f:
+                ls = f.readlines()
+            position_idx = 0
+            for i, line in enumerate(ls):
+                if "TOTAL ENERGY" in line:
+                    position_idx = i
+            if position_idx != 0:
+                logger.debug("xTB: {}: {}".format(c.path.name, ls[position_idx].replace("\n", "")))
+                c.energy = Units.hartree(float(ls[position_idx].split()[3])).to_kcal_mol
             else:
-                logger.error(f"xTB: {_c.path.name}: the energy entry was not found")
-                _c.deactivate("read_energy: xtb")
+                logger.error(f"xTB: {c.path.name}: the energy entry was not found")
+                c.deactivate("read_energy: xtb")
         logger.debug(f"done: {str(self)}")
         return self
 

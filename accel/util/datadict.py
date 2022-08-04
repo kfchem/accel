@@ -1,19 +1,19 @@
 from collections.abc import MutableMapping
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any
 
 from accel.util.log import logger
 
 
 class Data(MutableMapping):
-    __slots__ = ["_data", "_parent"]
+    __slots__ = ["_data", "parent"]
 
-    def __init__(self, parent_obj=None):
+    def __init__(self, parent=None):
         self._data: dict[str, Any] = {}
-        self._parent = parent_obj
+        self.parent = parent
 
     def set_data(self, key, value):
-        logger.debug(f"{str(self._parent)}: {key}: {value}")
+        logger.debug(f"{str(self.parent)}: {key}: {value}")
         return self._data.__setitem__(key, value)
 
     def __setitem__(self, key, value):
@@ -31,8 +31,8 @@ class Data(MutableMapping):
     def __len__(self):
         return len(self._data)
 
-    def duplicate(self, parent_obj=None):
-        _n = Data()
-        _n._data = deepcopy(self._data)
-        _n._parent = parent_obj
-        return _n
+    def duplicate(self, parent=None):
+        n = Data()
+        n._data = deepcopy(self._data)
+        n.parent = parent
+        return n

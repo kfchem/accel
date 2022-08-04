@@ -2,52 +2,51 @@ import subprocess
 from pathlib import Path
 
 from accel.base.boxcore import BoxCore
-from accel.base.systems import System
 from accel.base.selector import Selectors
+from accel.base.systems import System
 from accel.util import Execmd, FileType, Units
 from accel.util.log import logger
 
 
-def check_optimized(mulcos: BoxCore):
-    for _c in mulcos.get():
-        with _c.path.open() as f:
+def check_optimized(box: BoxCore):
+    for c in box.get():
+        with c.path.open() as f:
             _ls = f.readlines()
-        _flag = False
+        optimized = False
         for _l in _ls:
             if "*** OPTIMIZATION RUN DONE ***" in _l:
-                _flag = True
-        if _flag:
-            logger.debug(f"ORCA: {_c.path.name} was optimized successfully")
+                optimized = True
+        if optimized:
+            logger.debug(f"ORCA: {c.path.name} was optimized successfully")
         else:
-            logger.info(f"ORCA: {_c.path.name} was NOT optimized successfully")
-            _c.state = False
+            logger.info(f"ORCA: {c.path.name} was NOT optimized successfully")
+            c.state = False
 
 
-def read_energy(_c: System):
-    with _c.path.open() as f:
-        _ls = f.readlines()
-    _n = 0
-    for i, _l in enumerate(_ls):
-        if "FINAL SINGLE POINT ENERGY" in _l:
-            _n = i
-    if _n != 0:
-        logger.debug("Orca: {}: {}".format(_c.path.name, _ls[_n].replace("\n", "")))
-        _c.energy = Units.hartree(float(_ls[_n].split()[4])).to_kcal_mol
+def read_energy(c: System):
+    with c.path.open() as f:
+        ls = f.readlines()
+    position_idx = 0
+    for i, line in enumerate(ls):
+        if "FINAL SINGLE POINT ENERGY" in line:
+            position_idx = i
+    if position_idx != 0:
+        logger.debug("Orca: {}: {}".format(c.path.name, ls[position_idx].replace("\n", "")))
+        c.energy = Units.hartree(float(ls[position_idx].split()[4])).to_kcal_mol
     else:
-        logger.error(f"Orca: {_c.path.name}: the energy entry was not found")
-        _c.deactivate("read_energy: orca")
+        logger.error(f"Orca: {c.path.name}: the energy entry was not found")
+        c.deactivate("read_energy: orca")
 
 
 @FileType.add("app/orca/input", 40)
-def is_orca_input(_p: Path) -> bool:
-    if _p.suffix not in (".com", ".inp", ".inp"):
+def is_orca_input(p: Path) -> bool:
+    if p.suffix not in (".com", ".inp", ".inp"):
         return False
-
-    with _p.open() as _f:
-        for _i, _l in enumerate(_f):
-            if _l.startswith("#"):
+    with p.open() as f:
+        for line in f:
+            if line.startswith("#"):
                 continue
-            elif _l.startswith("!"):
+            elif line.startswith("!"):
                 return True
             else:
                 return False
@@ -55,79 +54,79 @@ def is_orca_input(_p: Path) -> bool:
 
 
 @FileType.add("app/orca/output", 60)
-def is_orca_output(_p: Path) -> bool:
-    if _p.suffix not in (".log", ".out"):
+def is_orca_output(p: Path) -> bool:
+    if p.suffix not in (".log", ".out"):
         return False
-    with _p.open() as _f:
-        for _i, _l in enumerate(_f):
-            if "* O   R   C   A *" in _l:
+    with p.open() as f:
+        for i, line in enumerate(f):
+            if "* O   R   C   A *" in line:
                 return True
-            if _i > 100:
+            if i > 100:
                 break
     return False
 
 
-def read_atoms_from_xyz(_c: System):
-    _xyz_path = _c.path.with_suffix(".xyz")
-    if not _xyz_path.exists():
-        _c.deactivate("read_atoms: orca from xyz file: not exists")
+def read_atoms_from_xyz(c: System):
+    xyz_path = c.path.with_suffix(".xyz")
+    if not xyz_path.exists():
+        c.deactivate("read_atoms: orca from xyz file: not exists")
         return None
-    with _xyz_path.open() as f:
-        _ls = f.readlines()
-    _axyz = [_l.split() for _l in _ls[2:] if len(_l.split()) == 4]
-    if len(_axyz) != int(_ls[0]):
-        _c.deactivate("read_atoms: orca from xyz file")
+    with xyz_path.open() as f:
+        ls = f.readlines()
+    axyz = [line.split() for line in ls[2:] if len(line.split()) == 4]
+    if len(axyz) != int(ls[0]):
+        c.deactivate("read_atoms: orca from xyz file")
         return None
-    _c.atoms.clear()
-    for _l in _axyz:
-        _c.atoms.append(_l)
+    c.atoms.clear()
+    for line in axyz:
+        c.atoms.append(line)
 
 
-def run(_c: System):
-    _cmd = [
+def run(c: System):
+    cmd_txts = [
         Execmd.get("orca"),
-        str(_c.path.resolve().absolute()),
-        str(_c.path.resolve().absolute().with_suffix(".out")),
+        str(c.path.resolve().absolute()),
+        str(c.path.resolve().absolute().with_suffix(".out")),
     ]
     try:
-        logger.info(f"running: {_c.name}: {''.join(_cmd)}")
-        _proc = subprocess.run(_cmd, cwd=str(_c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        _out = _proc.stdout.decode("utf-8").split("\n")
-        logger.info(f"finished: {_c.name}: {_out}")
+        logger.info(f"running: {c.name}: {''.join(cmd_txts)}")
+        proc = subprocess.run(cmd_txts, cwd=str(c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _out = proc.stdout.decode("utf-8").split("\n")
+        logger.info(f"finished: {c.name}: {_out}")
     except subprocess.CalledProcessError:
-        _c.state = False
-        logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
+        c.state = False
+        logger.error(f"failed: {c.name}: {''.join(cmd_txts)}")
 
 
-def submit(_c: System):
-    _cmd = [
+def submit(c: System):
+    cmd_txts = [
         Execmd.get("orca"),
-        str(_c.path.resolve().absolute()),
-        str(_c.path.resolve().absolute().with_suffix(".out")),
+        str(c.path.resolve().absolute()),
+        str(c.path.resolve().absolute().with_suffix(".out")),
     ]
     try:
-        subprocess.Popen(_cmd, cwd=str(_c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        logger.info(f"submited: {_c.name}: {''.join(_cmd)}")
+        subprocess.Popen(cmd_txts, cwd=str(c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        logger.info(f"submited: {c.name}: {''.join(cmd_txts)}")
     except subprocess.CalledProcessError:
-        _c.state = False
-        logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
+        c.state = False
+        logger.error(f"failed: {c.name}: {''.join(cmd_txts)}")
 
 
 class OrcBox(BoxCore):
     @Selectors.check_end.add("app/orca/output")
     def check_end(self):
-        for _c in self.get():
-            with _c.path.open() as f:
-                _ls = f.readlines()
-            _flag = False
-            for _l in _ls:
-                if "****ORCA TERMINATED NORMALLY****" in _l:
-                    _flag = True
-            if _flag:
-                logger.debug(f"ORCA: {_c.path.name} was terminated normally")
+        for c in self.get():
+            with c.path.open() as f:
+                ls = f.readlines()
+            terminated_normally = False
+            for line in ls:
+                if "****ORCA TERMINATED NORMALLY****" in line:
+                    terminated_normally = True
+            if terminated_normally:
+                logger.debug(f"ORCA: {c.path.name} was terminated normally")
             else:
-                logger.info(f"ORCA: {_c.path.name} was NOT terminated normally")
-                _c.deactivate("check_end")
+                logger.info(f"ORCA: {c.path.name} was NOT terminated normally")
+                c.deactivate("check_end")
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -138,42 +137,42 @@ class OrcBox(BoxCore):
 
     @Selectors.read_energy.add("app/orca/output")
     def read_energy(self):
-        for _c in self.get():
-            read_energy(_c)
+        for c in self.get():
+            read_energy(c)
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_atoms.add("app/orca/output")
     def read_atoms_from_xyz(self):
-        for _c in self.get():
-            read_atoms_from_xyz(_c)
+        for c in self.get():
+            read_atoms_from_xyz(c)
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_input(self):
-        for _c in self.get():
-            if not is_orca_input(_c.path):
-                _c.state = False
+        for c in self.get():
+            if not is_orca_input(c.path):
+                c.state = False
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_output(self):
-        for _c in self.get():
-            if not is_orca_output(_c.path):
-                _c.state = False
+        for c in self.get():
+            if not is_orca_output(c.path):
+                c.state = False
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.run.add("app/orca/input")
     def run(self):
-        for _c in self.get():
-            run(_c)
+        for c in self.get():
+            run(c)
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.submit.add("app/orca/input")
     def submit(self):
-        for _c in self.get():
-            submit(_c)
+        for c in self.get():
+            submit(c)
         logger.debug(f"done: {str(self)}")
         return self

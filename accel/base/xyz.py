@@ -1,6 +1,6 @@
 import math
 from statistics import mean
-from typing import List, Sequence, Tuple
+from typing import Sequence, Tuple
 
 import numpy as np
 from accel.base.atoms import Atom
@@ -9,7 +9,7 @@ from accel.base.tools import float_to_str
 
 
 def edit_bond_length(
-    _c: System,
+    system: System,
     atom_a: int,
     atom_b: int,
     target_length: float,
@@ -17,16 +17,16 @@ def edit_bond_length(
     move_along_with_a: Sequence[int] = (),
     move_along_with_b: Sequence[int] = (),
 ):
-    _vect = [0.0, 0.0, 0.0]
+    vect = [0.0, 0.0, 0.0]
     for i in range(3):
-        _vect[i] = _c.atoms.get(atom_b).xyz[i] - _c.atoms.get(atom_a).xyz[i]
-    _dist = math.sqrt(sum(x**2 for x in _vect))
+        vect[i] = system.atoms.get(atom_b).xyz[i] - system.atoms.get(atom_a).xyz[i]
+    distance = math.sqrt(sum(x**2 for x in vect))
 
     def move_atoms(atoms_list, vect_factor):
         for atom_no in atoms_list:
-            _c.atoms.get(atom_no).xyz = [
-                _val + (vect_factor * _vect[i] * (_dist - target_length) / _dist)
-                for i, _val in enumerate(_c.atoms.get(atom_no).xyz)
+            system.atoms.get(atom_no).xyz = [
+                _val + (vect_factor * vect[i] * (distance - target_length) / distance)
+                for i, _val in enumerate(system.atoms.get(atom_no).xyz)
             ]
 
     if fixed_atom == (False, False):
@@ -40,14 +40,14 @@ def edit_bond_length(
         raise ValueError
 
 
-def set_chirality(_c: System, center_index: int, sub_index: list[int]):
+def set_chirality(system: System, center_index: int, sub_index: list[int]):
     if len(sub_index) != 4:
         raise ValueError
     else:
         sorted_index = sorted(sub_index)
 
-    _sub_xyzs = np.array([_c.atoms.get(i).xyz for i in sorted_index[1:]]) - np.array(
-        [_c.atoms.get(sorted_index[0]).xyz for _ in range(3)]
+    _sub_xyzs = np.array([system.atoms.get(i).xyz for i in sorted_index[1:]]) - np.array(
+        [system.atoms.get(sorted_index[0]).xyz for _ in range(3)]
     )
     _ret = np.linalg.det(_sub_xyzs)
     if _ret > 0:
@@ -56,46 +56,45 @@ def set_chirality(_c: System, center_index: int, sub_index: list[int]):
         _ret = -1
     else:
         _ret = 0
-    _c.data[f"chiral_{center_index}_to_{sub_index}"] = _ret
+    system.data[f"chiral_{center_index}_to_{sub_index}"] = _ret
 
 
-def calc_length(_c: System, atom_index_a: int, atom_index_b: int, key: str = ""):
-
-    _a = _c.atoms.get(atom_index_a).xyz
-    _b = _c.atoms.get(atom_index_b).xyz
-    _d = [float(_a[i]) - float(_b[i]) for i in range(3)]
-    _dist = math.sqrt(sum(x**2 for x in _d))
+def calc_length(system: System, atom_index_a: int, atom_index_b: int, key: str = ""):
+    a_ = system.atoms.get(atom_index_a).xyz
+    b_ = system.atoms.get(atom_index_b).xyz
+    d_ = [float(a_[i]) - float(b_[i]) for i in range(3)]
+    distance = math.sqrt(sum(x**2 for x in d_))
     if key == "" or not isinstance(key, str):
         key = "distance_{}{}-{}{}".format(
-            _c.atoms.get(atom_index_a).symbol,
+            system.atoms.get(atom_index_a).symbol,
             str(atom_index_a),
-            _c.atoms.get(atom_index_b).symbol,
+            system.atoms.get(atom_index_b).symbol,
             str(atom_index_b),
         )
-    _c.data[key] = _dist
+    system.data[key] = distance
 
 
 def get_dihedral(atom_a: Atom, atom_b: Atom, atom_c: Atom, atom_d: Atom) -> float:
-    _va = np.array(atom_a.xyz)
-    _vb = np.array(atom_b.xyz)
-    _vc = np.array(atom_c.xyz)
-    _vd = np.array(atom_d.xyz)
-    _vab = _va - _vb
-    _vcb = _vc - _vb
-    _vdc = _vd - _vc
-    _pvac = np.cross(_vab, _vcb)
-    _pvbd = np.cross(_vdc, _vcb)
-    _dac = np.linalg.norm(_pvac)
-    _dbd = np.linalg.norm(_pvbd)
-    _angle = np.arccos(np.sum(_pvac * _pvbd) / (_dac * _dbd))
-    if np.sum(_pvac * np.cross(_pvbd, _vcb)) < 0:
-        _angle = -_angle
-    _angle = float(np.rad2deg(_angle))
-    return _angle
+    va = np.array(atom_a.xyz)
+    vb = np.array(atom_b.xyz)
+    vc = np.array(atom_c.xyz)
+    vd = np.array(atom_d.xyz)
+    vab = va - vb
+    vcb = vc - vb
+    vdc = vd - vc
+    pvac = np.cross(vab, vcb)
+    pvbd = np.cross(vdc, vcb)
+    dac = np.linalg.norm(pvac)
+    dbd = np.linalg.norm(pvbd)
+    angle = np.arccos(np.sum(pvac * pvbd) / (dac * dbd))
+    if np.sum(pvac * np.cross(pvbd, vcb)) < 0:
+        angle = -angle
+    angle = float(np.rad2deg(angle))
+    return angle
 
 
 def calc_dihedral(
-    _c: System,
+    system: System,
     atom_index_a: int,
     atom_index_b: int,
     atom_index_c: int,
@@ -104,38 +103,38 @@ def calc_dihedral(
 ):
     if key == "" or not isinstance(key, str):
         key = "dihedral_{}{}-{}{}-{}{}-{}{}".format(
-            _c.atoms.get(atom_index_a).symbol,
+            system.atoms.get(atom_index_a).symbol,
             str(atom_index_a),
-            _c.atoms.get(atom_index_b).symbol,
+            system.atoms.get(atom_index_b).symbol,
             str(atom_index_b),
-            _c.atoms.get(atom_index_c).symbol,
+            system.atoms.get(atom_index_c).symbol,
             str(atom_index_c),
-            _c.atoms.get(atom_index_d).symbol,
+            system.atoms.get(atom_index_d).symbol,
             str(atom_index_d),
         )
-    _c.data[key] = get_dihedral(
-        _c.atoms.get(atom_index_a),
-        _c.atoms.get(atom_index_b),
-        _c.atoms.get(atom_index_c),
-        _c.atoms.get(atom_index_d),
+    system.data[key] = get_dihedral(
+        system.atoms.get(atom_index_a),
+        system.atoms.get(atom_index_b),
+        system.atoms.get(atom_index_c),
+        system.atoms.get(atom_index_d),
     )
 
 
 def get_angle(atom_a: Atom, atom_b: Atom, atom_c: Atom) -> float:
-    _va = np.array(atom_a.xyz)
-    _vb = np.array(atom_b.xyz)
-    _vc = np.array(atom_c.xyz)
-    _vba = _vb - _va
-    _vbc = _vb - _vc
-    _dba = np.linalg.norm(_vba)
-    _dbc = np.linalg.norm(_vbc)
-    _angle = np.arccos(np.sum(_vba * _vbc) / (_dba * _dbc))
-    _angle = float(np.rad2deg(_angle))
-    return _angle
+    va = np.array(atom_a.xyz)
+    vb = np.array(atom_b.xyz)
+    vc = np.array(atom_c.xyz)
+    vba = vb - va
+    vbc = vb - vc
+    dba = np.linalg.norm(vba)
+    dbc = np.linalg.norm(vbc)
+    angle = np.arccos(np.sum(vba * vbc) / (dba * dbc))
+    angle = float(np.rad2deg(angle))
+    return angle
 
 
 def calc_angle(
-    _c: System,
+    system: System,
     atom_index_a: int,
     atom_index_b: int,
     atom_index_c: int,
@@ -143,30 +142,30 @@ def calc_angle(
 ):
     if key == "" or not isinstance(key, str):
         key = "angle_{}{}-{}{}-{}{}".format(
-            _c.atoms.get(atom_index_a).symbol,
+            system.atoms.get(atom_index_a).symbol,
             str(atom_index_a),
-            _c.atoms.get(atom_index_b).symbol,
+            system.atoms.get(atom_index_b).symbol,
             str(atom_index_b),
-            _c.atoms.get(atom_index_c).symbol,
+            system.atoms.get(atom_index_c).symbol,
             str(atom_index_c),
         )
-    _c.data[key] = get_angle(
-        _c.atoms.get(atom_index_a),
-        _c.atoms.get(atom_index_b),
-        _c.atoms.get(atom_index_c),
+    system.data[key] = get_angle(
+        system.atoms.get(atom_index_a),
+        system.atoms.get(atom_index_b),
+        system.atoms.get(atom_index_c),
     )
 
 
-def convert_to_mirror(_c: System, centering=True):
+def convert_to_mirror(system: System, centering=True):
     if centering:
-        _cnt = [mean([_a.xyz[i] for _a in _c.atoms]) for i in range(3)]
-        _prec = max(max(len(str(_a.xyz[i]).split(".")[1]) for _a in _c.atoms) for i in range(3))
-        _cnt = [round((-1) * _v, _prec) for _v in _cnt]
-    for _a in _c.atoms:
-        _xyz = [(-1) * _a.x, (-1) * _a.y, (-1) * _a.z]
+        center = [mean([a.xyz[i] for a in system.atoms]) for i in range(3)]
+        prec = max(max(len(str(_a.xyz[i]).split(".")[1]) for _a in system.atoms) for i in range(3))
+        center = [round((-1) * _v, prec) for _v in center]
+    for a in system.atoms:
+        xyz = [(-1) * a.x, (-1) * a.y, (-1) * a.z]
         if centering:
-            _xyz = [float_to_str(round(_v - _cnt[i], _prec)) for i, _v in enumerate(_xyz)]
-        _xyz = [float(float_to_str(_v)) for _v in _xyz]
-        _a.x = _xyz[0]
-        _a.y = _xyz[1]
-        _a.z = _xyz[2]
+            xyz = [float_to_str(round(_v - center[i], prec)) for i, _v in enumerate(xyz)]
+        xyz = [float(float_to_str(_v)) for _v in xyz]
+        a.x = xyz[0]
+        a.y = xyz[1]
+        a.z = xyz[2]
