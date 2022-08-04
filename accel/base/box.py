@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Iterable, Union
 
 from accel.base.boxcore import BoxCore
-from accel.base.mols import Mol
 from accel.base.selector import FuncSelector, Selectors
+from accel.base.systems import System
 from accel.plugin import Plugins
 from accel.util.log import logger
 
@@ -11,12 +11,12 @@ from accel.util.log import logger
 def adaptive_function_caller(box: "Box", selector: FuncSelector, filetype, **options):
     if filetype is not None:
         try:
-            selector(filetype, Box().bind(box.mols), **options)
+            selector(filetype, Box().bind(box.get()), **options)
         except ValueError:
-            for _c in box.mols:
+            for _c in box.get():
                 _c.deactivate("could not find an appropriate function")
     else:
-        for ft, confs in box.mols.filetypes.items():
+        for ft, confs in box.get().filetypes.items():
             try:
                 selector(ft, Box().bind(confs), **options)
             except ValueError:
@@ -26,9 +26,9 @@ def adaptive_function_caller(box: "Box", selector: FuncSelector, filetype, **opt
 
 
 class Box(BoxCore):
-    def __init__(self, files: Iterable[Union[Mol, Path, str]] = None):
+    def __init__(self, files: Iterable[Union[System, Path, str]] = None):
         if isinstance(files, BoxCore):
-            self._mols = files._mols
+            self.contents = files.contents
             self.data = files.data
         else:
             super().__init__(files=files)

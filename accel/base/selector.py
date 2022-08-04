@@ -5,7 +5,7 @@ from accel.util.log import logger
 
 class FuncSelector:
     def __init__(self) -> None:
-        self.funcs: Dict[str, Any] = {}
+        self.funcs: dict[str, Any] = {}
 
     def add(self, filetype: str):
         def _add_dec(func):

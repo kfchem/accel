@@ -3,14 +3,14 @@ from pathlib import Path
 from statistics import mean
 
 from accel.base.atoms import BondType
-from accel.base.mols import Mol
+from accel.base.systems import System
 from accel.base.tools import change_dir, float_to_str
 from accel.util import FileType
 from accel.util.constants import Elements
 from accel.util.log import logger
 
 
-def read_xyz(_c: Mol):
+def read_xyz(_c: System):
     with _c.path.open() as f:
         _ls = f.readlines()
     _axyz = [_l.split() for _l in _ls[2:] if len(_l.split()) == 4]
@@ -23,7 +23,7 @@ def read_xyz(_c: Mol):
     logger.debug(f"reading xyz of {_c.path.name}")
 
 
-def read_xyz_coordinates(_c: Mol):
+def read_xyz_coordinates(_c: System):
     with _c.path.open() as f:
         _ls = f.readlines()
     _axyz = [_l.split() for _l in _ls[2:] if len(_l.split()) == 4]
@@ -40,7 +40,7 @@ def read_xyz_coordinates(_c: Mol):
     logger.debug(f"reading xyz coordinate of {_c.path.name}")
 
 
-def write_xyz(_c: Mol, output_dir=None, change_path=False, centering=True):
+def write_xyz(_c: System, output_dir=None, change_path=False, centering=True):
     _ls = [str(len(_c.atoms)) + "\n"]
     _ls.append(_c.name + "\n")
     if centering:
@@ -75,7 +75,7 @@ def is_xyz_file(_p: Path):
 conv_sdf_charge = [0, 3, 2, 1, 0, -1, -2, -3]
 
 
-def read_mol(_c: Mol):
+def read_mol(_c: System):
     mol_data = {_key: [] for _key in ["header", "counts", "atom", "bond", "middle", "properties"]}
     with _c.path.open("r") as f:
         mol_lines = f.readlines()
@@ -145,7 +145,7 @@ def read_mol(_c: Mol):
     logger.debug(f"read {_c.name}")
 
 
-def get_mol_str(_c: Mol, centering=True) -> str:
+def get_mol_str(_c: System, centering=True) -> str:
     _ls = []
     _ls.append(_c.name + "\n")
     _now = datetime.datetime.now()
@@ -190,7 +190,7 @@ def get_mol_str(_c: Mol, centering=True) -> str:
     return "".join(_ls)
 
 
-def write_mol(_c: Mol, output_dir=None, change_path=False, centering=True) -> Path:
+def write_mol(_c: System, output_dir=None, change_path=False, centering=True) -> Path:
     mol_str = get_mol_str(_c, centering)
     _p = change_dir(_c.path, output_dir, _c.name).with_suffix(".sdf")
     with _p.open("w", newline="\n") as f:

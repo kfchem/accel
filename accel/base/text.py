@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from accel.base.mols import Mol
+from accel.base.systems import System
 from accel.base.tools import change_dir, float_to_str
 from accel.util.log import logger
 
 
-def replace_key(conf: Mol, lines: list[str]):
+def replace_key(conf: System, lines: list[str]):
     _rls = "".join(lines)
     while True:
         if "#NAME#" in _rls:
@@ -50,7 +50,7 @@ def replace_key(conf: Mol, lines: list[str]):
     return _rls[:-1]
 
 
-def replace_arg(conf: Mol, lines: list[str], arg: dict[str, str]):
+def replace_arg(conf: System, lines: list[str], arg: dict[str, str]):
     _rls = "".join(lines)
     while True:
         for key, val in arg.items():
@@ -63,7 +63,7 @@ def replace_arg(conf: Mol, lines: list[str], arg: dict[str, str]):
     return _rls[:-1]
 
 
-def write_input(_c: Mol, template: Path, odir=None, link=False, arg: dict[str, str] = None):
+def write_input(_c: System, template: Path, odir=None, link=False, arg: dict[str, str] = None):
     _tp = Path(template).resolve()
     if not _tp.exists():
         logger.error(f"{str(_tp)} not exist")

@@ -3,19 +3,19 @@ import time
 from pathlib import Path
 
 from accel.base.boxcore import BoxCore
-from accel.base.mols import Mol
 from accel.base.selector import Selectors
+from accel.base.systems import System
 from accel.util import Execmd, FileType
 from accel.util.log import logger
 
 
-def que_submit(_c: Mol):
+def que_submit(_c: System):
     try:
         _jid = subprocess.run([Execmd.get("qsub"), str(_c.path)], cwd=str(_c.path.parent), stdout=subprocess.PIPE)
         _jid = _jid.stdout.decode("utf-8").replace("\n", "")
         logger.info(f"qsub: {_c.path.name} was submitted")
     except subprocess.CalledProcessError:
-        _c.flag = False
+        _c.state = False
         _jid = "Submission Error"
         logger.error(f"qsub: failed submission of {_c.path.name}")
     _c.data["jobid"] = _jid
@@ -24,7 +24,7 @@ def que_submit(_c: Mol):
 def que_wait(mulcos: BoxCore, interval_time=10):
     logger.info("qsub: waiting completion of tasks")
     _jid_list = []
-    for _c in mulcos.mols:
+    for _c in mulcos.get():
         _jid_list.append(_c.data["jobid"])
     while len(_jid_list) != 0:
         time.sleep(interval_time)
@@ -53,7 +53,7 @@ def is_pbs_jobscript(_p: Path) -> bool:
 class PbsBox(BoxCore):
     @Selectors.submit.add("app/pbs/jobscript")
     def submit(self):
-        for _c in self.mols:
+        for _c in self.get():
             que_submit(_c)
         logger.debug(f"done: {str(self)}")
         return self
@@ -65,7 +65,7 @@ class PbsBox(BoxCore):
 
     @Selectors.run.add("app/pbs/jobscript")
     def run(self):
-        for _c in self.mols:
+        for _c in self.get():
             que_submit(_c)
         que_wait(self)
         logger.debug(f"done: {str(self)}")

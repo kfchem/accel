@@ -5,8 +5,8 @@ from accel.util.log import logger
 
 
 class FileType:
-    funcs: Dict[str, Any] = {}
-    metric: Dict[str, int] = {}
+    funcs: dict[str, Any] = {}
+    metric: dict[str, int] = {}
 
     @classmethod
     def add(cls, filetype: str, metric: int = 50):

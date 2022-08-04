@@ -4,12 +4,12 @@ from typing import List, Sequence, Tuple
 
 import numpy as np
 from accel.base.atoms import Atom
-from accel.base.mols import Mol
+from accel.base.systems import System
 from accel.base.tools import float_to_str
 
 
 def edit_bond_length(
-    _c: Mol,
+    _c: System,
     atom_a: int,
     atom_b: int,
     target_length: float,
@@ -40,7 +40,7 @@ def edit_bond_length(
         raise ValueError
 
 
-def set_chirality(_c: Mol, center_index: int, sub_index: List[int]):
+def set_chirality(_c: System, center_index: int, sub_index: list[int]):
     if len(sub_index) != 4:
         raise ValueError
     else:
@@ -59,7 +59,7 @@ def set_chirality(_c: Mol, center_index: int, sub_index: List[int]):
     _c.data[f"chiral_{center_index}_to_{sub_index}"] = _ret
 
 
-def calc_length(_c: Mol, atom_index_a: int, atom_index_b: int, key: str = ""):
+def calc_length(_c: System, atom_index_a: int, atom_index_b: int, key: str = ""):
 
     _a = _c.atoms.get(atom_index_a).xyz
     _b = _c.atoms.get(atom_index_b).xyz
@@ -95,7 +95,7 @@ def get_dihedral(atom_a: Atom, atom_b: Atom, atom_c: Atom, atom_d: Atom) -> floa
 
 
 def calc_dihedral(
-    _c: Mol,
+    _c: System,
     atom_index_a: int,
     atom_index_b: int,
     atom_index_c: int,
@@ -135,7 +135,7 @@ def get_angle(atom_a: Atom, atom_b: Atom, atom_c: Atom) -> float:
 
 
 def calc_angle(
-    _c: Mol,
+    _c: System,
     atom_index_a: int,
     atom_index_b: int,
     atom_index_c: int,
@@ -157,7 +157,7 @@ def calc_angle(
     )
 
 
-def convert_to_mirror(_c: Mol, centering=True):
+def convert_to_mirror(_c: System, centering=True):
     if centering:
         _cnt = [mean([_a.xyz[i] for _a in _c.atoms]) for i in range(3)]
         _prec = max(max(len(str(_a.xyz[i]).split(".")[1]) for _a in _c.atoms) for i in range(3))

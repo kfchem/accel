@@ -9,7 +9,7 @@ from typing import Dict, List, Union
 from accel.base.atoms import BondType
 from accel.base.boxcore import BoxCore
 from accel.base.formats import write_mol
-from accel.base.mols import Mol, Mols
+from accel.base.systems import System, Systems
 from accel.base.selector import Selectors
 from accel.base.tools import change_dir
 from accel.util import Execmd, FileType
@@ -17,9 +17,9 @@ from accel.util.constants import Elements, Unit, Units
 from accel.util.log import logger
 
 
-def _get_f_m_ct_list(lines: List[str]) -> List[Dict[str, Union[str, List]]]:
+def _get_f_m_ct_list(lines: list[str]) -> list[dict[str, Union[str, List]]]:
     ls = "".join(lines).replace("\n", " ").split()
-    words: List[str] = []
+    words: list[str] = []
     while True:
         try:
             words.append(ls.pop())
@@ -78,7 +78,7 @@ def _get_f_m_ct_list(lines: List[str]) -> List[Dict[str, Union[str, List]]]:
     return f_m_ct_list
 
 
-def _embed_f_m_ct(_c: Mol, f_m_ct: Dict[str, Union[str, List]]):
+def _embed_f_m_ct(_c: System, f_m_ct: dict[str, Union[str, List]]):
     for key in f_m_ct:
         if not isinstance(f_m_ct[key], str):
             continue
@@ -125,7 +125,7 @@ def _embed_f_m_ct(_c: Mol, f_m_ct: Dict[str, Union[str, List]]):
             _c.atoms.add_bond(_number_a, _number_b, BondType.undefined)
 
 
-def read_mae(_c: Mol):
+def read_mae(_c: System):
     with _c.path.open() as f:
         ls = f.readlines()
     try:
@@ -156,7 +156,7 @@ def is_maegz_format(_p: Path) -> bool:
     return True
 
 
-def read_potential_energy_from_mae(_c: Mol):
+def read_potential_energy_from_mae(_c: System):
     with _c.path.open() as f:
         ls = f.readlines()
     try:
@@ -179,13 +179,13 @@ def read_potential_energy_from_mae(_c: Mol):
 class MaeBox(BoxCore):
     @Selectors.read_atoms.add("format/mae")
     def read_mae(self):
-        for _c in self.mols:
+        for _c in self.get():
             read_mae(_c)
         logger.debug(f"done: {str(self)}")
         return self
 
     def read_maegz(self):
-        for _c in self.mols:
+        for _c in self.get():
             with gzip.open(_c.path, mode="rt") as f:
                 ls = f.readlines()
             try:
@@ -204,14 +204,14 @@ class MaeBox(BoxCore):
 
     @Selectors.read_energy.add("format/mae")
     def read_energy(self):
-        for _c in self.mols:
+        for _c in self.get():
             read_potential_energy_from_mae(_c)
         logger.debug(f"done: {str(self)}")
         return self
 
     def get_unzip(self, zero_fill_digit=3, max_loading=999):
         boxls = []
-        for _maegz in self.mols:
+        for _maegz in self.get():
             logger.info(f"reading {_maegz.name}")
             with gzip.open(_maegz.path, mode="rt") as f:
                 ls = f.readlines()
@@ -228,12 +228,12 @@ class MaeBox(BoxCore):
                 if num >= max_loading:
                     logger.error(f"max loading count {max_loading} reached")
                     break
-                new_c = Mol(file_path=_maegz.path)
+                new_c = System(file_path=_maegz.path)
                 new_c.name = "{c}_{num:0={zero}}".format(c=f_m_ct["s_m_title"], num=num + 1, zero=max_zero)
                 _embed_f_m_ct(new_c, f_m_ct)
                 boxls.append(new_c)
                 logger.info(f"read {new_c.name}")
-        ret_box = Mols().bind(boxls)
+        ret_box = Systems().bind(boxls)
         logger.debug(f"done: {str(self)}")
         return ret_box
 
@@ -248,7 +248,7 @@ class MaeBox(BoxCore):
         elif platform.system() == "Mac":
             pass
         with tempfile.TemporaryDirectory() as tmp_dir:
-            for _c in self.mols:
+            for _c in self.get():
                 mol_path = write_mol(_c, output_dir=tmp_dir, centering=False)
                 _p = change_dir(_c.path, directory, _c.name).with_suffix(".mae")
                 _txt = [
@@ -267,19 +267,19 @@ class MaeBox(BoxCore):
         logger.debug(f"done: {str(self)}")
         return self
 
-    def calc_energy(self, keys: List[str] = ["mmod_Potential_Energy-S-OPLS"], unit: Unit = Units.kJ_mol):
+    def calc_energy(self, keys: list[str] = ["mmod_Potential_Energy-S-OPLS"], unit: Unit = Units.kJ_mol):
         return super().calc_energy(keys=keys, unit=unit)
 
     def is_mae_format(self):
-        for _c in self.mols:
+        for _c in self.get():
             if not is_mae_format(_c.path):
-                _c.flag = False
+                _c.state = False
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_maegz_format(self):
-        for _c in self.mols:
+        for _c in self.get():
             if not is_maegz_format(_c.path):
-                _c.flag = False
+                _c.state = False
         logger.debug(f"done: {str(self)}")
         return self

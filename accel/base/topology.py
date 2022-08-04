@@ -1,16 +1,15 @@
 import itertools
 from collections import defaultdict
-from typing import Dict, List
 
 import numpy as np
 from accel.base.atoms import Atom, Atoms, BondType
-from accel.base.mols import Mol, Mols
+from accel.base.systems import System, Systems
 from accel.util.constants import Elements
 from accel.util.log import logger
 from accel.util.matrix import Matrix
 
 
-def aromatize(_c: Mol, single_threshold: int = 1.01, double_threshold: int = 1.01, max_depth: int = 18):
+def aromatize(_c: System, single_threshold: int = 1.01, double_threshold: int = 1.01, max_depth: int = 18):
     _atoms = _c.atoms.to_list()
     npxyz = [[_a.x, _a.y, _a.z] for _a in _atoms]
     npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
@@ -28,9 +27,9 @@ def aromatize(_c: Mol, single_threshold: int = 1.01, double_threshold: int = 1.0
     npdbl_mat = np.signbit((double_threshold * npdbl_mat) - npdist_mat)
     # double_threshold should be like 1.1 to reduce calculation cost
 
-    aromatic_mat: List[List[bool]] = (npcov_mat & npdbl_mat).tolist()
+    aromatic_mat: list[list[bool]] = (npcov_mat & npdbl_mat).tolist()
 
-    def path_to_other(start_idx: int, end_idx: int, route: List[int], ring_list: List[List[int]]):
+    def path_to_other(start_idx: int, end_idx: int, route: list[int], ring_list: list[list[int]]):
         route = route + [start_idx]
         for other_idx in [_idx for _idx, _flag in enumerate(aromatic_mat[start_idx]) if _flag is True]:
             if other_idx == end_idx and other_idx != route[-2]:
@@ -85,7 +84,7 @@ def aromatize(_c: Mol, single_threshold: int = 1.01, double_threshold: int = 1.0
         _c.atoms.bonds[id_a + 1, id_b + 1] = BondType.aromatic
 
 
-def embed_bonds(_c: Mol, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, triple_scaling=1.05):
+def embed_bonds(_c: System, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, triple_scaling=1.05):
     _atoms = _c.atoms.to_list()
     npxyz = [[_a.x, _a.y, _a.z] for _a in _atoms]
     npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
@@ -114,7 +113,7 @@ def embed_bonds(_c: Mol, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, 
     npsgl_mat = npcov_mat ^ npdbl_mat
     npdbl_mat = npdbl_mat ^ nptri_mat
 
-    mat_dict: Dict[int, np.ndarray] = {
+    mat_dict: dict[int, np.ndarray] = {
         BondType.single: npsgl_mat,
         BondType.double: npdbl_mat,
         BondType.triple: nptri_mat,
@@ -134,14 +133,14 @@ def embed_bonds(_c: Mol, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, 
     logger.debug(f"bonding information of {_c.name} was embeded")
 
 
-def embed_symm(_c: Mol):
-    def _reset_visited_flags(_c: Mol):
+def embed_symm(_c: System):
+    def _reset_visited_flags(_c: System):
         for _a in _c.atoms:
             _a.cache["unvisited"] = True
             _a.cache["ref_unvisited"] = True
         return None
 
-    def _del_visited_flags(_c: Mol):
+    def _del_visited_flags(_c: System):
         for _a in _c.atoms:
             del _a.cache["unvisited"]
             del _a.cache["ref_unvisited"]
@@ -295,7 +294,7 @@ def embed_symm(_c: Mol):
     numisomer_mat_list = {_m.tobytes(): _m for _m in numisomer_mat_list}.values()
 
     # check chirality here
-    def _invalid_chirality(original_conf: Mol, modified_xyz: np.ndarray) -> int:
+    def _invalid_chirality(original_conf: System, modified_xyz: np.ndarray) -> int:
         invalid_count = 0
         original_xyz = np.array([a.xyz for a in original_conf.atoms])
         for _a in original_conf.atoms:
@@ -309,7 +308,7 @@ def embed_symm(_c: Mol):
         return invalid_count
 
     # for TMS, cyclic_chiral_check has error
-    def _cyclic_chiral_check(_c: Mol, rotamer_mat_list, numisomer_mat_list):
+    def _cyclic_chiral_check(_c: System, rotamer_mat_list, numisomer_mat_list):
         unchanged_flag = True
         for rot_mat in rotamer_mat_list:
             original_xyz = np.array([at.xyz for at in _c.atoms])
@@ -347,7 +346,7 @@ def embed_symm(_c: Mol):
 
 
 def rmsd_pruning(
-    confs: Mols,
+    confs: Systems,
     rmsd_threshold: float = 0.01,
     for_all: bool = False,
     redundant_check: int = 3,
@@ -395,8 +394,8 @@ def rmsd_pruning(
         return min_rmsd, min_rot_mat
 
     def cal_sym_rmsd(
-        ref_conf: Mol,
-        tar_conf: Mol,
+        ref_conf: System,
+        tar_conf: System,
         all_perturbation: bool,
         max_cycle: int,
         numisomer_swap: bool,
@@ -411,7 +410,7 @@ def rmsd_pruning(
         min_rmsd = kabsch_rmsd(np_ref_xyzs, np_tar_xyzs)
         min_rot_mat = np.identity(xyz_length)
         logger.debug(f"first RMSD of {ref_conf.name} & {tar_conf.name}: {min_rmsd:.10f}")
-        tar_conf_rotamers: List[Matrix] = tar_conf.data["rotamer"]
+        tar_conf_rotamers: list[Matrix] = tar_conf.data["rotamer"]
         tar_conf_atoms_list = tar_conf.atoms.to_list()
         _rotamers = [
             {"flag": False, "matrix": _m.ordered(tar_conf_atoms_list).to_ndarray()} for _m in tar_conf_rotamers
@@ -438,7 +437,7 @@ def rmsd_pruning(
                 np_tar_xyzs,
             )
         if numisomer_swap:
-            tar_conf_numisomers: List[Matrix] = tar_conf.data["numisomer"]
+            tar_conf_numisomers: list[Matrix] = tar_conf.data["numisomer"]
             tar_conf_atoms_list = tar_conf.atoms.to_list()
             _numisomers = [
                 {"flag": False, "matrix": _m.ordered(tar_conf_atoms_list).to_ndarray()} for _m in tar_conf_numisomers
@@ -448,28 +447,28 @@ def rmsd_pruning(
 
     for label in confs.labels.keys():
         try:
-            _molcfs = sorted(confs.labels[label], key=lambda t: t.energy)
+            _Systemcfs = sorted(confs.labels[label], key=lambda t: t.energy)
             _for_all = for_all
         except TypeError:
-            _molcfs = confs.labels[label]
+            _Systemcfs = confs.labels[label]
             logger.error(f"sorting failed in {label}: for_all is flagged")
             _for_all = True
 
-        for i in range(len(_molcfs)):
-            if _molcfs[i].flag:
+        for i in range(len(_Systemcfs)):
+            if _Systemcfs[i].flag:
                 redundant_counter = 0
-                for q in range(i + 1, len(_molcfs)):
-                    if _molcfs[q].flag:
+                for q in range(i + 1, len(_Systemcfs)):
+                    if _Systemcfs[q].flag:
                         _rms = cal_sym_rmsd(
-                            _molcfs[i],
-                            _molcfs[q],
+                            _Systemcfs[i],
+                            _Systemcfs[q],
                             all_perturbation=all_perturbation,
                             max_cycle=1024,
                             numisomer_swap=include_numeric_isomers,
                         )
-                        logger.debug(f"Final RMSD of {_molcfs[i].name} & {_molcfs[q].name}: {_rms:.10f}")
+                        logger.debug(f"Final RMSD of {_Systemcfs[i].name} & {_Systemcfs[q].name}: {_rms:.10f}")
                         if _rms <= rmsd_threshold:
-                            _molcfs[q].deactivate("rmsd_limit")
+                            _Systemcfs[q].deactivate("rmsd_limit")
                         elif not _for_all:
                             if redundant_counter >= redundant_check:
                                 logger.debug(f"counter reached {redundant_counter}: moving to next conf")
@@ -479,7 +478,7 @@ def rmsd_pruning(
 
 
 # not coded yet
-def parse_angles(_c: Mol):
+def parse_angles(_c: System):
     bonds = _c.bonds_list
     ang_list = []
     for i, bond in enumerate(bonds):
@@ -500,7 +499,7 @@ def parse_angles(_c: Mol):
 
 
 # not coded yet
-def parse_dihedrals(_c: Mol):
+def parse_dihedrals(_c: System):
     bonds = _c.bonds_list
     dih_list = []
     for i, bond in enumerate(bonds):
@@ -525,7 +524,7 @@ def parse_dihedrals(_c: Mol):
     _c.data["dihedrals_list"] = dih_list
 
 
-def map_numbers(confs: Mols, reference_confs: Mols):
+def map_numbers(confs: Systems, reference_confs: Systems):
     def _get_dihedral(atom_a: Atom, atom_b: Atom, atom_c: Atom, atom_d: Atom):
         _va = np.array(atom_a.xyz)
         _vb = np.array(atom_b.xyz)
@@ -547,7 +546,7 @@ def map_numbers(confs: Mols, reference_confs: Mols):
         #     atom_d.symbol, atom_d.number, _angle))
         return _angle
 
-    def _det_rs(subs: List[int], test_atoms: Atoms):
+    def _det_rs(subs: list[int], test_atoms: Atoms):
         neighbors_xyz = [test_atoms.get(_num).xyz for _num in sorted(subs)]
         neighbors_xyz_np = np.array(neighbors_xyz[1:])
         neighbors_xyz_np = neighbors_xyz_np - np.array(neighbors_xyz[0])
@@ -571,7 +570,7 @@ def map_numbers(confs: Mols, reference_confs: Mols):
             atom_d.number,
         ]
 
-    def _det_ez(subs: List[int], test_atoms: Atoms):
+    def _det_ez(subs: list[int], test_atoms: Atoms):
         _dihed = _get_dihedral(
             test_atoms.get(subs[0]),
             test_atoms.get(subs[1]),
@@ -586,9 +585,9 @@ def map_numbers(confs: Mols, reference_confs: Mols):
 
     for label in confs.labels:
         reference_c = reference_confs.labels[label].get()
-        problematic_rs: List[Atom] = []
-        problematic_ez: List[Atom] = []
-        problematic_allene: List[Atom] = []
+        problematic_rs: list[Atom] = []
+        problematic_ez: list[Atom] = []
+        problematic_allene: list[Atom] = []
         for _a in reference_c.atoms:
             if "isomeric_subs_list" in _a.cache:
                 if len(_a.bonds) == 4 and len(_a.cache["isomeric_subs_list"]) in (1, 2, 3):
@@ -633,7 +632,7 @@ def map_numbers(confs: Mols, reference_confs: Mols):
             )
 
         def resolve_mapping(
-            _c: Mol, problematic_rs: List[Atom], problematic_ez: List[Atom], problematic_allene: List[Atom]
+            _c: System, problematic_rs: list[Atom], problematic_ez: list[Atom], problematic_allene: list[Atom]
         ):
             for ref_atom in problematic_rs:
                 if "valid_numeric_chirality" in _c.atoms.get(ref_atom.number).cache:
@@ -717,7 +716,7 @@ def map_numbers(confs: Mols, reference_confs: Mols):
                 logger.error(f"{_c.name}: reached max iteration")
 
 
-def order_by_cip(substitutions: List[Atom], roots: List[Atom]):
+def order_by_cip(substitutions: list[Atom], roots: list[Atom]):
     for sub in substitutions:
         pass
     return []

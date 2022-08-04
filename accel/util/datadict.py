@@ -9,7 +9,7 @@ class Data(MutableMapping):
     __slots__ = ["_data", "_parent"]
 
     def __init__(self, parent_obj=None):
-        self._data: Dict[str, Any] = {}
+        self._data: dict[str, Any] = {}
         self._parent = parent_obj
 
     def set_data(self, key, value):

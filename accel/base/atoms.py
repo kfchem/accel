@@ -1,7 +1,7 @@
 import copy
 from collections import deque
 from collections.abc import MutableSequence
-from typing import Dict, Iterator, List, MutableMapping, Sequence, Set, Tuple
+from typing import Iterator, List, MutableMapping, Sequence, Set, Tuple
 
 import numpy as np
 from accel.util.constants import Elements
@@ -71,7 +71,7 @@ class Atom:
             return None
         return self._atoms._list.index(self) + 1
 
-    def _get_bonding_atom(self, bond_types: List[int]):
+    def _get_bonding_atom(self, bond_types: list[int]):
         if self._atoms is None:
             logger.error(f"{self} has no parent atoms")
             return []
@@ -87,29 +87,29 @@ class Atom:
         return bonds_list
 
     @property
-    def bonds(self) -> List["Atom"]:
+    def bonds(self) -> list["Atom"]:
         return self._get_bonding_atom(
             [BondType.undefined, BondType.single, BondType.double, BondType.triple, BondType.aromatic, BondType.any]
         )
 
     @property
-    def single(self) -> List["Atom"]:
+    def single(self) -> list["Atom"]:
         return self._get_bonding_atom([BondType.single])
 
     @property
-    def double(self) -> List["Atom"]:
+    def double(self) -> list["Atom"]:
         return self._get_bonding_atom([BondType.double])
 
     @property
-    def triple(self) -> List["Atom"]:
+    def triple(self) -> list["Atom"]:
         return self._get_bonding_atom([BondType.triple])
 
     @property
-    def aromatic(self) -> List["Atom"]:
+    def aromatic(self) -> list["Atom"]:
         return self._get_bonding_atom([BondType.aromatic])
 
     @property
-    def contacts(self) -> List["Atom"]:
+    def contacts(self) -> list["Atom"]:
         return self._get_bonding_atom([BondType.contact])
 
     @property
@@ -185,7 +185,7 @@ class Bonds(MutableMapping):
     def __init__(self, number_of_atoms: int):
         self._matrix: np.ndarray = np.zeros((number_of_atoms, number_of_atoms), dtype=int)
 
-    def to_dict(self) -> Dict[Tuple[int], int]:
+    def to_dict(self) -> dict[Tuple[int], int]:
         bonds_dict = {}
         for index_a in range(len(self._matrix)):
             for index_b in range(len(self._matrix)):
@@ -265,10 +265,10 @@ class Bonds(MutableMapping):
 def _get_maps(
     atoms_a: "Atoms",
     atoms_b: "Atoms",
-    known_pairs: List[Tuple[int]] = [],
+    known_pairs: list[Tuple[int]] = [],
     exclude_known: bool = False,
     terminal_first: bool = False,
-) -> List[List[Tuple[Atom]]]:
+) -> list[list[Tuple[Atom]]]:
 
     if len(known_pairs) == 0:
         known_check = False
@@ -293,7 +293,7 @@ def _get_maps(
             return True
         return False
 
-    initial_pairs: List[Tuple[Atom]] = []
+    initial_pairs: list[Tuple[Atom]] = []
 
     if terminal_first:
         for atom_a in atoms_a:
@@ -379,7 +379,7 @@ def _get_maps(
                         continue
                 initial_pairs.append((atom_a, atom_b))
 
-    def _is_proper_bonding(atom_a: Atom, atom_b: Atom, side_pairs: List[Tuple[Atom]]):
+    def _is_proper_bonding(atom_a: Atom, atom_b: Atom, side_pairs: list[Tuple[Atom]]):
         atom_a_bonds = atom_a.bonds
         atom_b_bonds = atom_b.bonds
         # shoud swap here
@@ -396,11 +396,11 @@ def _get_maps(
             return False
         return True
 
-    initial_chains: List[List[Tuple[Atom]]] = [[]]
+    initial_chains: list[list[Tuple[Atom]]] = [[]]
     for initial_pair in initial_pairs:
         stack = [[initial_pair]]
         while stack:
-            side_pairs: List[Tuple[Atom]] = stack.pop()
+            side_pairs: list[Tuple[Atom]] = stack.pop()
             if len(side_pairs) > len(initial_chains[-1]):
                 initial_chains = [side_pairs]
                 logger.debug(f"initial_chains updated: {[(_pr[0].number, _pr[1].number) for _pr in side_pairs]}")
@@ -427,7 +427,7 @@ def _get_maps(
     if len(initial_chains) == 1 and len(initial_chains[0]) == 0:
         return []
 
-    canonical_initial_chains: Dict[List[set], Tuple[Tuple[Atom]]] = {}
+    canonical_initial_chains: dict[list[set], Tuple[Tuple[Atom]]] = {}
     for chain in initial_chains:
         key = tuple(sorted([(_pr[0].number, _pr[1].number) for _pr in chain], key=lambda t: t[0]))
         canonical_initial_chains[key] = chain
@@ -436,7 +436,7 @@ def _get_maps(
         logger.debug(f"canonical_initial_chains: {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
 
     min_invalid = None
-    h_matched_chains: List[List[Tuple[Atom]]] = [[]]
+    h_matched_chains: list[list[Tuple[Atom]]] = [[]]
     for chain in canonical_initial_chains.values():
         invalid_atoms = 0
         for pair in chain:
@@ -473,7 +473,7 @@ def _get_maps(
             return True
         return False
 
-    extended_chains: List[List[Tuple[Atom]]] = []
+    extended_chains: list[list[Tuple[Atom]]] = []
     for chain in h_matched_chains:
         stack = deque([_pr for _pr in chain])
         assigned_as = given_known_as + [_pr[0] for _pr in chain]
@@ -485,7 +485,7 @@ def _get_maps(
             stack.append((new_pair[0], new_pair[1]))
             stack.appendleft(root_pair)
 
-        def _get_large(atoms: List[Atom]) -> List[Atom]:
+        def _get_large(atoms: list[Atom]) -> list[Atom]:
             trees = [[{_a}] for _a in atoms]
             for _ in range(16):
                 for tree in trees:
@@ -573,7 +573,7 @@ def _get_maps(
 
         extended_chains.append([(_a, _b) for _a, _b in zip(assigned_as, assigned_bs)])
 
-    canonical_extended_chains: Dict[Tuple[Tuple[int]], List[Tuple[Atom]]] = {}
+    canonical_extended_chains: dict[Tuple[Tuple[int]], list[Tuple[Atom]]] = {}
     for chain in extended_chains:
         key = tuple(sorted([(_pr[0].number, _pr[1].number) for _pr in chain], key=lambda t: t[0]))
         canonical_extended_chains[key] = chain
@@ -581,7 +581,7 @@ def _get_maps(
     for chain in canonical_extended_chains.values():
         logger.debug(f"canonical_extended_chains: {[(_pr[0].number, _pr[1].number) for _pr in chain]}")
 
-    recursive_extended_chains: List[List[Tuple[Atom]]] = []
+    recursive_extended_chains: list[list[Tuple[Atom]]] = []
     for chain in canonical_extended_chains.values():
         if len(chain) < min(len(atoms_a), len(atoms_b)):
             new_maps = _get_maps(atoms_a, atoms_b, known_pairs=chain, exclude_known=True, terminal_first=False)
@@ -593,7 +593,7 @@ def _get_maps(
         else:
             recursive_extended_chains.append(chain)
 
-    canonical_recursive_extended_chains: Dict[Tuple[Tuple[int]], List[Tuple[Atom]]] = {}
+    canonical_recursive_extended_chains: dict[Tuple[Tuple[int]], list[Tuple[Atom]]] = {}
     for chain in recursive_extended_chains:
         if exclude_known:
             chain = chain[len(known_pairs) :]
@@ -606,7 +606,7 @@ def _get_maps(
     return canonical_recursive_extended_chains.values()
 
 
-def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: List[List[Tuple[Atom]]]) -> List[List[Tuple[Atom]]]:
+def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[Tuple[Atom]]]) -> list[list[Tuple[Atom]]]:
     return atom_maps
 
 
@@ -614,7 +614,7 @@ class Atoms(MutableSequence):
     __slots__ = ["_list", "bonds"]
 
     def __init__(self) -> None:
-        self._list: List[Atom] = []
+        self._list: list[Atom] = []
         self.bonds: Bonds = None
 
     def _new_atom_instance(self, value) -> Atom:
@@ -666,7 +666,7 @@ class Atoms(MutableSequence):
             self.bonds.swap(number_a, number_b)
         return self
 
-    def to_list(self) -> List[Atom]:
+    def to_list(self) -> list[Atom]:
         return [_a for _a in self._list]
 
     def get(self, value) -> Atom:
@@ -747,9 +747,9 @@ class Atoms(MutableSequence):
     def get_maps(
         self,
         target: "Atoms",
-        known_pairs: List[Tuple[int]] = [],
+        known_pairs: list[Tuple[int]] = [],
         terminal_first: bool = False,
-    ) -> List[List[int]]:
+    ) -> list[list[int]]:
         atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self, atoms_map)
         for chain in atoms_map:
@@ -771,9 +771,9 @@ class Atoms(MutableSequence):
     def get_mapped(
         self,
         target: "Atoms",
-        known_pairs: List[Tuple[int]] = [],
+        known_pairs: list[Tuple[int]] = [],
         terminal_first: bool = False,
-    ) -> List["Atoms"]:
+    ) -> list["Atoms"]:
         atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self, atoms_map)
         for chain in atoms_map:

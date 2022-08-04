@@ -7,7 +7,7 @@ from accel.util.log import logger
 
 
 def read_total_free_energy(mulcos: BoxCore):
-    for _c in mulcos.mols:
+    for _c in mulcos.get():
         with _c.path.open(encoding="utf-8") as f:
             _ls = f.readlines()
         _n = 0
@@ -19,7 +19,7 @@ def read_total_free_energy(mulcos: BoxCore):
             _c.energy = Units.hartree(float(_ls[_n].split()[4])).to_kcal_mol
         else:
             logger.error(f"xTB: {_c.path.name}: the energy entry was not found")
-            _c.flag = False
+            _c.state = False
 
 
 @FileType.add("app/xtb/output", 50)
@@ -38,7 +38,7 @@ def is_xtb_output(_p: Path) -> bool:
 class XtbBox(BoxCore):
     @Selectors.check_end.add("app/xtb/output")
     def check_end(self):
-        for _c in self.mols:
+        for _c in self.get():
             with _c.path.open(encoding="utf-8") as f:
                 _ls = f.readlines()
             _flag = False
@@ -55,7 +55,7 @@ class XtbBox(BoxCore):
 
     @Selectors.read_energy.add("app/xtb/output")
     def read_energy(self):
-        for _c in self.mols:
+        for _c in self.get():
             with _c.path.open(encoding="utf-8") as f:
                 _ls = f.readlines()
             _n = 0

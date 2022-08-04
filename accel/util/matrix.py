@@ -8,8 +8,8 @@ from accel.util.log import logger
 class Matrix:
     __slots__ = ["indexes", "_matrix", "symmetric"]
 
-    def __init__(self, indexes: List[Any]) -> None:
-        self.indexes: List[Any] = indexes
+    def __init__(self, indexes: list[Any]) -> None:
+        self.indexes: list[Any] = indexes
         self._matrix: np.ndarray = None
         self.symmetric: bool = False
 
@@ -48,15 +48,15 @@ class Matrix:
             raise ValueError
 
     @classmethod
-    def zeros(cls, indexes: List[Any]):
+    def zeros(cls, indexes: list[Any]):
         return Matrix(indexes).bind(np.zeros((len(indexes), len(indexes))))
 
     @classmethod
-    def ones(cls, indexes: List[Any]):
+    def ones(cls, indexes: list[Any]):
         return Matrix(indexes).bind(np.ones((len(indexes), len(indexes))))
 
     @classmethod
-    def identity(cls, indexes: List[Any]):
+    def identity(cls, indexes: list[Any]):
         return Matrix(indexes).bind(np.identity(len(indexes)))
 
     def ordered(self, indexes: list) -> "Matrix":

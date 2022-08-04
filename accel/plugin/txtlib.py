@@ -17,14 +17,14 @@ def _line_formatter(new_line):
 
 class TxtBox(BoxCore):
     def read_text(self):
-        for _c in self.mols:
+        for _c in self.get():
             with _c.path.open() as f:
                 _ls = f.readlines()
             _c.data["txt"] = _ls
         return self
 
     def write_text(self, directory: Path = None, change_path: bool = False, suffix: str = None):
-        for _c in self.mols:
+        for _c in self.get():
             _p = change_dir(_c.path, directory, _c.name)
             if suffix is not None:
                 _p = _p.with_suffix(suffix)
@@ -36,43 +36,43 @@ class TxtBox(BoxCore):
         return self
 
     def delete_lines_by_key(self, keyword: str):
-        for _c in self.mols:
-            _ls: List[str] = _c.data["txt"]
+        for _c in self.get():
+            _ls: list[str] = _c.data["txt"]
             for i, _l in enumerate(_ls):
                 if keyword in _l:
                     _ls.pop(i)
         return self
 
-    def delete_lines(self, numbers: List[int]):
-        for _c in self.mols:
-            _ls: List[str] = _c.data["txt"]
+    def delete_lines(self, numbers: list[int]):
+        for _c in self.get():
+            _ls: list[str] = _c.data["txt"]
             for _i in numbers:
                 _ls.pop(int(_i - 1))
         return self
 
     def insert_lines(self, number: int, new_lines=""):
         new_lines = _line_formatter(new_lines)
-        for _c in self.mols:
-            _ls: List[str] = _c.data["txt"]
+        for _c in self.get():
+            _ls: list[str] = _c.data["txt"]
             _ls = _ls[: number - 1] + new_lines + _ls[number - 2 :]
         return self
 
     def append_lines(self, new_lines=""):
         new_lines = _line_formatter(new_lines)
-        for _c in self.mols:
-            _ls: List[str] = _c.data["txt"]
+        for _c in self.get():
+            _ls: list[str] = _c.data["txt"]
             _ls.extend(new_lines)
         return self
 
     def replace_lines(self, number: int, new_lines=""):
         new_lines = _line_formatter(new_lines)
-        for _c in self.mols:
-            _ls: List[str] = _c.data["txt"]
+        for _c in self.get():
+            _ls: list[str] = _c.data["txt"]
             _ls[number - 1] = "".join(new_lines)
         return self
 
     def parse_keys(self):
-        for _c in self.mols:
-            _ls: List[str] = _c.data["txt"]
+        for _c in self.get():
+            _ls: list[str] = _c.data["txt"]
             _ls = replace_key(_c, _ls)
         return self

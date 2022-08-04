@@ -5,7 +5,7 @@ from accel.util.log import logger
 
 
 class Execmd:
-    _path_dict: Dict[str, str] = {}
+    _path_dict: dict[str, str] = {}
 
     @classmethod
     def get(cls, key: str) -> str:

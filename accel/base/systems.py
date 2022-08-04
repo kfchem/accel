@@ -2,7 +2,7 @@ from collections import defaultdict
 from collections.abc import MutableSequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Iterator, List, Union
+from typing import Dict, Iterator, Union
 
 from accel.base.atoms import Atoms
 from accel.util import FileType
@@ -10,13 +10,13 @@ from accel.util.datadict import Data
 from accel.util.log import Log, logger
 
 
-class Mol:
+class System:
     __slots__ = [
         "path",
         "name",
         "filetype",
         "label",
-        "flag",
+        "state",
         "history",
         "energy",
         "atoms",
@@ -38,7 +38,7 @@ class Mol:
             self.name = self.path.stem
             self.filetype = FileType.analyse(self.path)
         self.label: str = ""
-        self.flag: bool = True
+        self.state: bool = True
         self.history: str = ""
         self.energy: float = None
         self.atoms: Atoms = Atoms()
@@ -124,7 +124,7 @@ class Mol:
         else:
             self.history += f"; {reason}"
         self._initialized = False
-        self.flag = False
+        self.state = False
         self._initialized = True
         return self
 
@@ -137,7 +137,7 @@ class Mol:
             _path = self.path.absolute()
         data_dict["Path"] = _path
         data_dict["FileType"] = self.filetype
-        if self.flag:
+        if self.state:
             data_dict["State"] = "ACTIVE"
         else:
             data_dict["State"] = "INACTIVE"
@@ -155,13 +155,13 @@ class Mol:
             logger.info(f"{self.name}: {_key}: {str(_val)}")
         return self
 
-    def duplicate(self) -> "Mol":
-        _n = Mol()
+    def duplicate(self) -> "System":
+        _n = System()
         _n._initialized = False
         _n.path = deepcopy(self.path)
         _n.name = self.name
         _n.label = self.label
-        _n.flag = self.flag
+        _n.state = self.state
         _n.energy = self.energy
         _n.atoms = self.atoms.duplicate()
         _n.data = self.data.duplicate(_n)
@@ -172,27 +172,27 @@ class Mol:
         return _n
 
 
-class Mols(MutableSequence):
+class Systems(MutableSequence):
     __slots__ = ["_list"]
 
     def __init__(self):
-        self._list: List[Mol] = []
+        self._list: list[System] = []
 
-    def _new_confomer(self, value: Union[Mol, Path, str]) -> Mol:
-        if isinstance(value, Mol):
+    def _new_confomer(self, value: Union[System, Path, str]) -> System:
+        if isinstance(value, System):
             return value
         elif isinstance(value, Path) or isinstance(value, str):
-            return Mol(file_path=value)
+            return System(file_path=value)
         else:
             raise ValueError
 
     def __str__(self):
         return f"Box having {len(self._list)} conformers"
 
-    def __getitem__(self, index) -> Mol:
+    def __getitem__(self, index) -> System:
         return self._list[index]
 
-    def __setitem__(self, index, value: Union[Mol, Path, str]):
+    def __setitem__(self, index, value: Union[System, Path, str]):
         new_conformer = self._new_confomer(value)
         self._list[index] = new_conformer
 
@@ -202,17 +202,17 @@ class Mols(MutableSequence):
     def __len__(self):
         return len(self._list)
 
-    def __iter__(self) -> Iterator[Mol]:
+    def __iter__(self) -> Iterator[System]:
         return super().__iter__()
 
-    def __add__(self, other: "Mols"):
-        return Mols().bind(self._list + other._list)
+    def __add__(self, other: "Systems"):
+        return Systems().bind(self._list + other._list)
 
     def show(self):
         for _index, _c in enumerate(self._list, 1):
-            _c: Mol = _c
+            _c: System = _c
             _is_active = "ACTIVE"
-            if _c.flag is False:
+            if _c.state is False:
                 _is_active = "------"
             if _c.energy is None:
                 _energy = "----- kcal/mol"
@@ -224,44 +224,44 @@ class Mols(MutableSequence):
                 _path = _c.path.absolute()
             logger.info(f"{_index:>4}: {_c.name:<18}: {_is_active:<7}: {_c.label:<12}: {_energy}: {str(_path)}")
 
-    def insert(self, index: int, value: Union[Mol, Path, str]):
+    def insert(self, index: int, value: Union[System, Path, str]):
         new_conformer = self._new_confomer(value)
         self._list.insert(index, new_conformer)
 
-    def swap(self, index_a: int, index_b: int) -> "Mols":
+    def swap(self, index_a: int, index_b: int) -> "Systems":
         self._list[index_a], self._list[index_b] = (
             self._list[index_b],
             self._list[index_a],
         )
         return self
 
-    def to_list(self) -> List[Mol]:
+    def to_list(self) -> list[System]:
         return [_c for _c in self._list]
 
-    def bind(self, data_list: List[Mol]):
+    def bind(self, data_list: list[System]):
         if isinstance(data_list, list):
             self._list = data_list
         else:
             self._list = list(data_list)
         return self
 
-    def duplicate(self, parent_obj=None) -> "Mols":
-        _n = Mols()
+    def duplicate(self, parent_obj=None) -> "Systems":
+        _n = Systems()
         _n._list = [_c.duplicate() for _c in self._list]
         return _n
 
     @property
-    def labels(self) -> Dict[str, "Mols"]:
+    def labels(self) -> dict[str, "Systems"]:
         label_dict = defaultdict(list)
         for _c in self._list:
             label_dict[_c.label].append(_c)
         sorted_dict = {}
         for _key in sorted(label_dict.keys()):
-            sorted_dict[_key] = Mols().bind(label_dict[_key])
+            sorted_dict[_key] = Systems().bind(label_dict[_key])
         return sorted_dict
 
     @property
-    def filetypes(self) -> Dict[str, "Mols"]:
+    def filetypes(self) -> dict[str, "Systems"]:
         filetype_dict = defaultdict(list)
         for _c in self._list:
             if _c.filetype is None:
@@ -270,24 +270,24 @@ class Mols(MutableSequence):
                 filetype_dict[_c.filetype].append(_c)
         sorted_dict = {}
         for _key in sorted(filetype_dict.keys()):
-            sorted_dict[_key] = Mols().bind(filetype_dict[_key])
+            sorted_dict[_key] = Systems().bind(filetype_dict[_key])
         return sorted_dict
 
-    def has_state(self, state: Union[bool, None] = True) -> "Mols":
+    def has_state(self, state: Union[bool, None] = True) -> "Systems":
         if state is not None:
-            return Mols().bind([_c for _c in self._list if _c.flag is state])
+            return Systems().bind([_c for _c in self._list if _c.state is state])
         else:
-            return Mols().bind([_c for _c in self._list])
+            return Systems().bind([_c for _c in self._list])
 
-    def has_bonds(self, flag: bool = True) -> "Mols":
-        return Mols().bind([_c for _c in self._list if _c.atoms.has_bonds() is flag])
+    def has_bonds(self, flag: bool = True) -> "Systems":
+        return Systems().bind([_c for _c in self._list if _c.atoms.has_bonds() is flag])
 
-    def has_energy(self, min_limit: float = None, max_limit: float = None) -> "Mols":
+    def has_energy(self, min_limit: float = None, max_limit: float = None) -> "Systems":
         _cs = [_c for _c in self._list if _c.energy is not None]
         if min_limit is None and max_limit is None:
-            return Mols().bind(_cs)
+            return Systems().bind(_cs)
         if len(_cs) == 0:
-            return Mols().bind(_cs)
+            return Systems().bind(_cs)
         if min_limit is None:
             min_limit = min(_c.energy for _c in _cs)
         else:
@@ -297,23 +297,23 @@ class Mols(MutableSequence):
         else:
             max_limit = float(max_limit)
         _cs = [_c for _c in _cs if min_limit <= _c.energy and _c.energy <= max_limit]
-        return Mols().bind(_cs)
+        return Systems().bind(_cs)
 
-    def has_label(self, label: str = None) -> "Mols":
+    def has_label(self, label: str = None) -> "Systems":
         if label is None:
-            return Mols().bind([_c for _c in self._list if _c.label != ""])
+            return Systems().bind([_c for _c in self._list if _c.label != ""])
         else:
             _cs = self.labels.get(label)
             if _cs is None:
-                return Mols()
+                return Systems()
             return _cs
 
-    def has_distribution(self, min_limit: float = None, max_limit: float = None) -> "Mols":
+    def has_distribution(self, min_limit: float = None, max_limit: float = None) -> "Systems":
         _cs = [_c for _c in self._list if _c.distribution is not None]
         if min_limit is None and max_limit is None:
-            return Mols().bind(_cs)
+            return Systems().bind(_cs)
         if len(_cs) == 0:
-            return Mols().bind(_cs)
+            return Systems().bind(_cs)
         if min_limit is None:
             min_limit = min(_c.distribution for _c in _cs)
         else:
@@ -323,19 +323,19 @@ class Mols(MutableSequence):
         else:
             max_limit = float(max_limit)
         _cs = [_c for _c in _cs if min_limit <= _c.distribution and _c.distribution <= max_limit]
-        return Mols().bind(_cs)
+        return Systems().bind(_cs)
 
-    def has_data(self, key: str, value=None) -> "Mols":
+    def has_data(self, key: str, value=None) -> "Systems":
         if value is None:
             _cs = [_c for _c in self._list if key in _c.data.keys()]
         else:
             _cs = [_c for _c in self._list if _c.data.get(key) is value]
-        return Mols().bind(_cs)
+        return Systems().bind(_cs)
 
-    def has_filetype(self, filetype: str) -> "Mols":
-        return Mols().bind([_c for _c in self._list if _c.filetype is filetype])
+    def has_filetype(self, filetype: str) -> "Systems":
+        return Systems().bind([_c for _c in self._list if _c.filetype is filetype])
 
-    def get(self, identifier=None) -> Mol:
+    def get(self, identifier=None) -> System:
         if len(self._list) == 0:
             return None
         elif identifier is None:
@@ -356,7 +356,7 @@ class Mols(MutableSequence):
                 return None
         return None
 
-    def sorted(self, key="energy") -> "Mols":
+    def sorted(self, key="energy") -> "Systems":
         if key == "energy":
             new_list = sorted(self._list, key=lambda _c: _c.energy)
         elif key == "name":
@@ -365,4 +365,4 @@ class Mols(MutableSequence):
             new_list = sorted(self._list, key=lambda _c: _c.label)
         else:
             new_list = sorted(self._list, key=lambda _c: _c.data.get(key))
-        return Mols().bind(new_list)
+        return Systems().bind(new_list)

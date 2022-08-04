@@ -2,14 +2,14 @@ import subprocess
 from pathlib import Path
 
 from accel.base.boxcore import BoxCore
-from accel.base.mols import Mol
+from accel.base.systems import System
 from accel.base.selector import Selectors
 from accel.util import Execmd, FileType, Units
 from accel.util.log import logger
 
 
 def check_optimized(mulcos: BoxCore):
-    for _c in mulcos.mols:
+    for _c in mulcos.get():
         with _c.path.open() as f:
             _ls = f.readlines()
         _flag = False
@@ -20,10 +20,10 @@ def check_optimized(mulcos: BoxCore):
             logger.debug(f"ORCA: {_c.path.name} was optimized successfully")
         else:
             logger.info(f"ORCA: {_c.path.name} was NOT optimized successfully")
-            _c.flag = False
+            _c.state = False
 
 
-def read_energy(_c: Mol):
+def read_energy(_c: System):
     with _c.path.open() as f:
         _ls = f.readlines()
     _n = 0
@@ -67,7 +67,7 @@ def is_orca_output(_p: Path) -> bool:
     return False
 
 
-def read_atoms_from_xyz(_c: Mol):
+def read_atoms_from_xyz(_c: System):
     _xyz_path = _c.path.with_suffix(".xyz")
     if not _xyz_path.exists():
         _c.deactivate("read_atoms: orca from xyz file: not exists")
@@ -83,7 +83,7 @@ def read_atoms_from_xyz(_c: Mol):
         _c.atoms.append(_l)
 
 
-def run(_c: Mol):
+def run(_c: System):
     _cmd = [
         Execmd.get("orca"),
         str(_c.path.resolve().absolute()),
@@ -95,11 +95,11 @@ def run(_c: Mol):
         _out = _proc.stdout.decode("utf-8").split("\n")
         logger.info(f"finished: {_c.name}: {_out}")
     except subprocess.CalledProcessError:
-        _c.flag = False
+        _c.state = False
         logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
 
 
-def submit(_c: Mol):
+def submit(_c: System):
     _cmd = [
         Execmd.get("orca"),
         str(_c.path.resolve().absolute()),
@@ -109,14 +109,14 @@ def submit(_c: Mol):
         subprocess.Popen(_cmd, cwd=str(_c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         logger.info(f"submited: {_c.name}: {''.join(_cmd)}")
     except subprocess.CalledProcessError:
-        _c.flag = False
+        _c.state = False
         logger.error(f"failed: {_c.name}: {''.join(_cmd)}")
 
 
 class OrcBox(BoxCore):
     @Selectors.check_end.add("app/orca/output")
     def check_end(self):
-        for _c in self.mols:
+        for _c in self.get():
             with _c.path.open() as f:
                 _ls = f.readlines()
             _flag = False
@@ -138,42 +138,42 @@ class OrcBox(BoxCore):
 
     @Selectors.read_energy.add("app/orca/output")
     def read_energy(self):
-        for _c in self.mols:
+        for _c in self.get():
             read_energy(_c)
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.read_atoms.add("app/orca/output")
     def read_atoms_from_xyz(self):
-        for _c in self.mols:
+        for _c in self.get():
             read_atoms_from_xyz(_c)
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_input(self):
-        for _c in self.mols:
+        for _c in self.get():
             if not is_orca_input(_c.path):
-                _c.flag = False
+                _c.state = False
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_output(self):
-        for _c in self.mols:
+        for _c in self.get():
             if not is_orca_output(_c.path):
-                _c.flag = False
+                _c.state = False
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.run.add("app/orca/input")
     def run(self):
-        for _c in self.mols:
+        for _c in self.get():
             run(_c)
         logger.debug(f"done: {str(self)}")
         return self
 
     @Selectors.submit.add("app/orca/input")
     def submit(self):
-        for _c in self.mols:
+        for _c in self.get():
             submit(_c)
         logger.debug(f"done: {str(self)}")
         return self

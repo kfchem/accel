@@ -9,8 +9,8 @@ class Elements:
     with Path(__file__).parent.joinpath("elements.pkl").open("rb") as f:
         # the following data were taken from
         # https://en.wikipedia.org/wiki/Atomic_radii_of_the_elements_(data_page) and references therein
-        data: List[Dict[str, Union[str, float]]] = pickle.load(f)
-    symbols: List[str] = [_e["symbol"] for _e in data]
+        data: list[dict[str, Union[str, float]]] = pickle.load(f)
+    symbols: list[str] = [_e["symbol"] for _e in data]
     lower_symbols = [sym.lower() for sym in symbols]
 
     @classmethod
@@ -31,7 +31,7 @@ class Elements:
         return canonical_symbol
 
     @classmethod
-    def get_element(cls, input: Union[int, str]) -> Dict[str, Any]:
+    def get_element(cls, input: Union[int, str]) -> dict[str, Any]:
         if isinstance(input, int) and input < len(cls.data):
             return cls.data[input]
         elif isinstance(input, str):
@@ -40,11 +40,11 @@ class Elements:
 
 # part of the following constants values were taken from https://physics.nist.gov/cuu/Constants/
 class CONSTANTS:
-    hartree_to_J = 4.3597447222071 * (10 ** -18)
+    hartree_to_J = 4.3597447222071 * (10**-18)
     hartree_to_eV = 27.211386245988
     cal_to_J = 4.184
-    boltzman_constant_in_J_over_K = 1.380649 * (10 ** -23)
-    avogadros_constant_in_over_mol = 6.02214076 * (10 ** 23)
+    boltzman_constant_in_J_over_K = 1.380649 * (10**-23)
+    avogadros_constant_in_over_mol = 6.02214076 * (10**23)
     gas_constant_in_J_over_mol_K = boltzman_constant_in_J_over_K * avogadros_constant_in_over_mol
 
 
@@ -83,7 +83,7 @@ class Unit:
 
 class Units:
     hartree = Unit(CONSTANTS.hartree_to_J * CONSTANTS.avogadros_constant_in_over_mol)
-    kJ_mol = Unit(10 ** 3)
-    kcal_mol = Unit(CONSTANTS.cal_to_J * 10 ** 3)
+    kJ_mol = Unit(10**3)
+    kcal_mol = Unit(CONSTANTS.cal_to_J * 10**3)
     J_mol = Unit(1)
     eV = Unit(CONSTANTS.hartree_to_J * CONSTANTS.avogadros_constant_in_over_mol / CONSTANTS.hartree_to_eV)
