@@ -72,9 +72,9 @@ class BoxCore:
         logger.debug(f"done: {str(self)}")
         return self
 
-    def bind(self, systems: Systems):
-        if isinstance(systems, Systems):
-            self.contents = systems
+    def bind(self, contents: Systems):
+        if isinstance(contents, Systems):
+            self.contents = contents
         else:
             logger.error("bind method accepts only Systems instance")
             raise TypeError
@@ -343,7 +343,7 @@ class BoxCore:
 
     def write_input(self, template: Path, directory=None, link: bool = True, arg: dict[str, str] = None):
         for c in self.get():
-            text.write_input(system=c, template=template, odir=directory, link=link, arg=arg)
+            text.write_input(c=c, template=template, odir=directory, link=link, arg=arg)
         Log.set_output_dir(directory)
         logger.debug(f"done: {str(self)}")
         return self

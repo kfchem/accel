@@ -9,7 +9,7 @@ from accel.base.tools import float_to_str
 
 
 def edit_bond_length(
-    system: System,
+    c: System,
     atom_a: int,
     atom_b: int,
     target_length: float,
@@ -19,14 +19,14 @@ def edit_bond_length(
 ):
     vect = [0.0, 0.0, 0.0]
     for i in range(3):
-        vect[i] = system.atoms.get(atom_b).xyz[i] - system.atoms.get(atom_a).xyz[i]
+        vect[i] = c.atoms.get(atom_b).xyz[i] - c.atoms.get(atom_a).xyz[i]
     distance = math.sqrt(sum(x**2 for x in vect))
 
     def move_atoms(atoms_list, vect_factor):
         for atom_no in atoms_list:
-            system.atoms.get(atom_no).xyz = [
+            c.atoms.get(atom_no).xyz = [
                 _val + (vect_factor * vect[i] * (distance - target_length) / distance)
-                for i, _val in enumerate(system.atoms.get(atom_no).xyz)
+                for i, _val in enumerate(c.atoms.get(atom_no).xyz)
             ]
 
     if fixed_atom == (False, False):
@@ -40,14 +40,14 @@ def edit_bond_length(
         raise ValueError
 
 
-def set_chirality(system: System, center_index: int, sub_index: list[int]):
+def set_chirality(c: System, center_index: int, sub_index: list[int]):
     if len(sub_index) != 4:
         raise ValueError
     else:
         sorted_index = sorted(sub_index)
 
-    _sub_xyzs = np.array([system.atoms.get(i).xyz for i in sorted_index[1:]]) - np.array(
-        [system.atoms.get(sorted_index[0]).xyz for _ in range(3)]
+    _sub_xyzs = np.array([c.atoms.get(i).xyz for i in sorted_index[1:]]) - np.array(
+        [c.atoms.get(sorted_index[0]).xyz for _ in range(3)]
     )
     _ret = np.linalg.det(_sub_xyzs)
     if _ret > 0:
@@ -56,22 +56,22 @@ def set_chirality(system: System, center_index: int, sub_index: list[int]):
         _ret = -1
     else:
         _ret = 0
-    system.data[f"chiral_{center_index}_to_{sub_index}"] = _ret
+    c.data[f"chiral_{center_index}_to_{sub_index}"] = _ret
 
 
-def calc_length(system: System, atom_index_a: int, atom_index_b: int, key: str = ""):
-    a_ = system.atoms.get(atom_index_a).xyz
-    b_ = system.atoms.get(atom_index_b).xyz
+def calc_length(c: System, atom_index_a: int, atom_index_b: int, key: str = ""):
+    a_ = c.atoms.get(atom_index_a).xyz
+    b_ = c.atoms.get(atom_index_b).xyz
     d_ = [float(a_[i]) - float(b_[i]) for i in range(3)]
     distance = math.sqrt(sum(x**2 for x in d_))
     if key == "" or not isinstance(key, str):
         key = "distance_{}{}-{}{}".format(
-            system.atoms.get(atom_index_a).symbol,
+            c.atoms.get(atom_index_a).symbol,
             str(atom_index_a),
-            system.atoms.get(atom_index_b).symbol,
+            c.atoms.get(atom_index_b).symbol,
             str(atom_index_b),
         )
-    system.data[key] = distance
+    c.data[key] = distance
 
 
 def get_dihedral(atom_a: Atom, atom_b: Atom, atom_c: Atom, atom_d: Atom) -> float:
@@ -94,7 +94,7 @@ def get_dihedral(atom_a: Atom, atom_b: Atom, atom_c: Atom, atom_d: Atom) -> floa
 
 
 def calc_dihedral(
-    system: System,
+    c: System,
     atom_index_a: int,
     atom_index_b: int,
     atom_index_c: int,
@@ -103,20 +103,20 @@ def calc_dihedral(
 ):
     if key == "" or not isinstance(key, str):
         key = "dihedral_{}{}-{}{}-{}{}-{}{}".format(
-            system.atoms.get(atom_index_a).symbol,
+            c.atoms.get(atom_index_a).symbol,
             str(atom_index_a),
-            system.atoms.get(atom_index_b).symbol,
+            c.atoms.get(atom_index_b).symbol,
             str(atom_index_b),
-            system.atoms.get(atom_index_c).symbol,
+            c.atoms.get(atom_index_c).symbol,
             str(atom_index_c),
-            system.atoms.get(atom_index_d).symbol,
+            c.atoms.get(atom_index_d).symbol,
             str(atom_index_d),
         )
-    system.data[key] = get_dihedral(
-        system.atoms.get(atom_index_a),
-        system.atoms.get(atom_index_b),
-        system.atoms.get(atom_index_c),
-        system.atoms.get(atom_index_d),
+    c.data[key] = get_dihedral(
+        c.atoms.get(atom_index_a),
+        c.atoms.get(atom_index_b),
+        c.atoms.get(atom_index_c),
+        c.atoms.get(atom_index_d),
     )
 
 
@@ -134,7 +134,7 @@ def get_angle(atom_a: Atom, atom_b: Atom, atom_c: Atom) -> float:
 
 
 def calc_angle(
-    system: System,
+    c: System,
     atom_index_a: int,
     atom_index_b: int,
     atom_index_c: int,
@@ -142,26 +142,26 @@ def calc_angle(
 ):
     if key == "" or not isinstance(key, str):
         key = "angle_{}{}-{}{}-{}{}".format(
-            system.atoms.get(atom_index_a).symbol,
+            c.atoms.get(atom_index_a).symbol,
             str(atom_index_a),
-            system.atoms.get(atom_index_b).symbol,
+            c.atoms.get(atom_index_b).symbol,
             str(atom_index_b),
-            system.atoms.get(atom_index_c).symbol,
+            c.atoms.get(atom_index_c).symbol,
             str(atom_index_c),
         )
-    system.data[key] = get_angle(
-        system.atoms.get(atom_index_a),
-        system.atoms.get(atom_index_b),
-        system.atoms.get(atom_index_c),
+    c.data[key] = get_angle(
+        c.atoms.get(atom_index_a),
+        c.atoms.get(atom_index_b),
+        c.atoms.get(atom_index_c),
     )
 
 
-def convert_to_mirror(system: System, centering=True):
+def convert_to_mirror(c: System, centering=True):
     if centering:
-        center = [mean([a.xyz[i] for a in system.atoms]) for i in range(3)]
-        prec = max(max(len(str(_a.xyz[i]).split(".")[1]) for _a in system.atoms) for i in range(3))
+        center = [mean([a.xyz[i] for a in c.atoms]) for i in range(3)]
+        prec = max(max(len(str(_a.xyz[i]).split(".")[1]) for _a in c.atoms) for i in range(3))
         center = [round((-1) * _v, prec) for _v in center]
-    for a in system.atoms:
+    for a in c.atoms:
         xyz = [(-1) * a.x, (-1) * a.y, (-1) * a.z]
         if centering:
             xyz = [float_to_str(round(_v - center[i], prec)) for i, _v in enumerate(xyz)]

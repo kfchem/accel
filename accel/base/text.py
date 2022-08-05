@@ -5,15 +5,15 @@ from accel.base.tools import change_dir, float_to_str
 from accel.util.log import logger
 
 
-def replace_key(system: System, lines: list[str]):
+def replace_key(c: System, lines: list[str]):
     rls = "".join(lines)
     while True:
         if "#NAME#" in rls:
-            rls = rls.replace("#NAME#", system.name)
+            rls = rls.replace("#NAME#", c.name)
             continue
         if "#DATA[" in rls:
             key = rls.split("#DATA[")[1].split("]#")[0]
-            rls = rls.replace("#DATA[" + key + "]#", system.data[key])
+            rls = rls.replace("#DATA[" + key + "]#", c.data[key])
             continue
         if "#AXYZ#" in rls:
             _xyz = [
@@ -23,34 +23,34 @@ def replace_key(system: System, lines: list[str]):
                     float_to_str(_a.y),
                     float_to_str(_a.z),
                 )
-                for _a in system.atoms
+                for _a in c.atoms
             ]
             rls = rls.replace("#AXYZ#", "\n".join(_xyz))
             continue
         if "#ATOMS#" in rls:
-            rls = rls.replace("#ATOMS#", str(len(system.atoms)))
+            rls = rls.replace("#ATOMS#", str(len(c.atoms)))
             continue
         if "#CHG#" in rls:
-            rls = rls.replace("#CHG#", str(system.charge))
+            rls = rls.replace("#CHG#", str(c.charge))
             continue
         if "#MULT#" in rls:
-            rls = rls.replace("#MULT#", str(system.multiplicity))
+            rls = rls.replace("#MULT#", str(c.multiplicity))
             continue
         if "#ENRGY#" in rls:
-            rls = rls.replace("#ENRGY#", str(system.energy))
+            rls = rls.replace("#ENRGY#", str(c.energy))
             continue
         if "#PATH#" in rls:
-            rls = rls.replace("#PATH#", str(system.path))
+            rls = rls.replace("#PATH#", str(c.path))
             continue
         if "#LABEL#" in rls:
-            rls = rls.replace("#LABEL#", str(system.label))
+            rls = rls.replace("#LABEL#", str(c.label))
             continue
         break
     rls = [_l + "\n" for _l in rls.split("\n")]
     return rls[:-1]
 
 
-def replace_arg(system: System, lines: list[str], arg: dict[str, str]):
+def replace_arg(c: System, lines: list[str], arg: dict[str, str]):
     rls = "".join(lines)
     while True:
         for key, val in arg.items():
@@ -63,20 +63,20 @@ def replace_arg(system: System, lines: list[str], arg: dict[str, str]):
     return rls[:-1]
 
 
-def write_input(system: System, template: Path, odir=None, link=False, arg: dict[str, str] = None):
+def write_input(c: System, template: Path, odir=None, link=False, arg: dict[str, str] = None):
     tp = Path(template).resolve()
     if not tp.exists():
         logger.error(f"{str(tp)} not exist")
         raise ValueError
     with tp.open("r") as f:
         ls = f.readlines()
-    ls = replace_key(system, ls)
+    ls = replace_key(c, ls)
     if arg is not None:
         arg = {str(_k): str(_v) for _k, _v in arg.items()}
-        ls = replace_arg(system, ls, arg)
-    p = change_dir(system.path, odir, system.name).with_suffix(tp.suffix)
+        ls = replace_arg(c, ls, arg)
+    p = change_dir(c.path, odir, c.name).with_suffix(tp.suffix)
     with p.open("w", newline="\n") as f:
         f.writelines(ls)
     logger.info(f"{p.name} created")
     if link:
-        system.path = p
+        c.path = p
