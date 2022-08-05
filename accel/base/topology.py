@@ -9,19 +9,19 @@ from accel.util.log import logger
 from accel.util.matrix import Matrix
 
 
-def aromatize(_c: System, single_threshold: int = 1.01, double_threshold: int = 1.01, max_depth: int = 18):
-    _atoms = _c.atoms.to_list()
-    npxyz = [[_a.x, _a.y, _a.z] for _a in _atoms]
+def aromatize(c: System, single_threshold: int = 1.01, double_threshold: int = 1.01, max_depth: int = 18):
+    a_list = c.atoms.to_list()
+    npxyz = [[a.x, a.y, a.z] for a in a_list]
     npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
     npdist_mat = np.sqrt(np.sum(npdist_mat**2, axis=-1))
 
-    npcov = [Elements.get_element(_a.symbol)["single"] for _a in _atoms]
+    npcov = [Elements.get_element(_a.symbol)["single"] for _a in a_list]
     npcov = [_v if _v is not None else np.nan for _v in npcov]
     npcov_mat = np.expand_dims(npcov, axis=1) + np.expand_dims(npcov, axis=0)
     npcov_mat = np.signbit(npdist_mat - single_threshold * npcov_mat)
     # single_threshold should be like 0.9 to reduce calculation cost
 
-    npdbl = [Elements.get_element(_a.symbol)["double"] for _a in _atoms]
+    npdbl = [Elements.get_element(_a.symbol)["double"] for _a in a_list]
     npdbl = [_v if _v is not None else np.nan for _v in npdbl]
     npdbl_mat = np.expand_dims(npdbl, axis=1) + np.expand_dims(npdbl, axis=0)
     npdbl_mat = np.signbit((double_threshold * npdbl_mat) - npdist_mat)
@@ -41,9 +41,9 @@ def aromatize(_c: System, single_threshold: int = 1.01, double_threshold: int = 
                 continue
             path_to_other(other_idx, end_idx, route, ring_list)
 
-    aromatic_atom = [False for _ in range(len(_atoms))]
+    aromatic_atom = [False for _ in range(len(a_list))]
     aromatic_rings = []
-    for cheking_idx in range(len(_atoms)):
+    for cheking_idx in range(len(a_list)):
         if aromatic_atom[cheking_idx]:
             continue
         ring_list = []
@@ -53,7 +53,7 @@ def aromatize(_c: System, single_threshold: int = 1.01, double_threshold: int = 
         for ring in ring_list:
             electrons = 0
             for atom_idx in ring:
-                _symbol = _c.atoms[atom_idx].symbol
+                _symbol = c.atoms[atom_idx].symbol
                 if _symbol == "C":
                     electrons += 1
                 elif _symbol == "O":
@@ -61,7 +61,7 @@ def aromatize(_c: System, single_threshold: int = 1.01, double_threshold: int = 
                 elif _symbol == "S":
                     electrons += 2
                 elif _symbol == "N":
-                    if len(_c.atoms[atom_idx].bonds) == 3:
+                    if len(c.atoms[atom_idx].bonds) == 3:
                         electrons += 2
                     else:
                         electrons += 1
@@ -81,31 +81,31 @@ def aromatize(_c: System, single_threshold: int = 1.01, double_threshold: int = 
     aromatic_bonds_set = {(id_a, id_b) for id_a, id_b in aromatic_bonds_set if id_a < id_b}
 
     for id_a, id_b in aromatic_bonds_set:
-        _c.atoms.bonds[id_a + 1, id_b + 1] = BondType.aromatic
+        c.atoms.bonds[id_a + 1, id_b + 1] = BondType.aromatic
 
 
-def embed_bonds(_c: System, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, triple_scaling=1.05):
-    _atoms = _c.atoms.to_list()
-    npxyz = [[_a.x, _a.y, _a.z] for _a in _atoms]
+def embed_bonds(c: System, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, triple_scaling=1.05):
+    a_list = c.atoms.to_list()
+    npxyz = [[_a.x, _a.y, _a.z] for _a in a_list]
     npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
     npdist_mat = np.sqrt(np.sum(npdist_mat**2, axis=-1))
 
-    npcov = [Elements.get_element(_a.symbol)["single"] for _a in _atoms]
+    npcov = [Elements.get_element(_a.symbol)["single"] for _a in a_list]
     npcov = [_v if _v is not None else np.nan for _v in npcov]
     npcov_mat = np.expand_dims(npcov, axis=1) + np.expand_dims(npcov, axis=0)
     npcov_mat = np.signbit(npdist_mat - cov_scaling * npcov_mat)
 
-    npvdw = [Elements.get_element(_a.symbol)["vdw"] for _a in _atoms]
+    npvdw = [Elements.get_element(_a.symbol)["vdw"] for _a in a_list]
     npvdw = [_v if _v is not None else np.nan for _v in npvdw]
     npvdw_mat = np.expand_dims(npvdw, axis=1) + np.expand_dims(npvdw, axis=0)
     npvdw_mat = np.signbit(npdist_mat - vdw_scaling * npvdw_mat) ^ npcov_mat
 
-    npdbl = [Elements.get_element(_a.symbol)["double"] for _a in _atoms]
+    npdbl = [Elements.get_element(_a.symbol)["double"] for _a in a_list]
     npdbl = [_v if _v is not None else np.nan for _v in npdbl]
     npdbl_mat = np.expand_dims(npdbl, axis=1) + np.expand_dims(npdbl, axis=0)
     npdbl_mat = np.signbit(npdist_mat - double_scaling * npdbl_mat)
 
-    nptri = [Elements.get_element(_a.symbol)["triple"] for _a in _atoms]
+    nptri = [Elements.get_element(_a.symbol)["triple"] for _a in a_list]
     nptri = [_v if _v is not None else np.nan for _v in nptri]
     nptri_mat = np.expand_dims(nptri, axis=1) + np.expand_dims(nptri, axis=0)
     nptri_mat = np.signbit(npdist_mat - triple_scaling * nptri_mat)
@@ -120,38 +120,38 @@ def embed_bonds(_c: System, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.0
         BondType.contact: npvdw_mat,
     }
 
-    _c.atoms.init_bonds()
+    c.atoms.init_bonds()
 
     for _tyep, _mat in mat_dict.items():
-        for index_a in range(len(_atoms)):
-            for index_b in range(len(_atoms)):
+        for index_a in range(len(a_list)):
+            for index_b in range(len(a_list)):
                 if index_a >= index_b:
                     continue
                 if _mat[index_a, index_b]:
-                    _c.atoms.bonds[index_a + 1, index_b + 1] = _tyep
+                    c.atoms.bonds[index_a + 1, index_b + 1] = _tyep
 
-    logger.debug(f"bonding information of {_c.name} was embeded")
+    logger.debug(f"bonding information of {c.name} was embeded")
 
 
-def embed_symm(_c: System):
-    def _reset_visited_flags(_c: System):
-        for _a in _c.atoms:
-            _a.cache["unvisited"] = True
-            _a.cache["ref_unvisited"] = True
+def embed_symm(c: System):
+    def _reset_visited_flags(c: System):
+        for a in c.atoms:
+            a.cache["unvisited"] = True
+            a.cache["ref_unvisited"] = True
         return None
 
-    def _del_visited_flags(_c: System):
-        for _a in _c.atoms:
-            del _a.cache["unvisited"]
-            del _a.cache["ref_unvisited"]
+    def _del_visited_flags(c: System):
+        for a in c.atoms:
+            del a.cache["unvisited"]
+            del a.cache["ref_unvisited"]
         return None
 
-    _reset_visited_flags(_c)
-    for _a in _c.atoms:
+    _reset_visited_flags(c)
+    for a in c.atoms:
         # generate tree by BFS
         atom_trees = []
-        for root in _a.bonds:
-            _a.cache["unvisited"] = False
+        for root in a.bonds:
+            a.cache["unvisited"] = False
             prop_tree = defaultdict(list)
             stack = []
             stack.append([root, 0])
@@ -166,7 +166,7 @@ def embed_symm(_c: System):
                 for _nb in node.bonds:
                     if _nb.cache["unvisited"]:
                         stack.append([_nb, distance + 1])
-            _reset_visited_flags(_c)
+            _reset_visited_flags(c)
             prop_list = []
             for distance in sorted(prop_tree.keys()):
                 prop = defaultdict(int)
@@ -217,11 +217,11 @@ def embed_symm(_c: System):
 
         for _pair in candidate_pair:
             pair_atoms_list = []
-            _a.cache["unvisited"] = False
-            _a.cache["ref_unvisited"] = False
+            a.cache["unvisited"] = False
+            a.cache["ref_unvisited"] = False
             if recursive_dfs(_pair["ref_root"], _pair["tar_root"], pair_atoms_list):
                 _pair["pair_list"] = pair_atoms_list
-            _reset_visited_flags(_c)
+            _reset_visited_flags(c)
 
         # logger.debug('checked candidates of atom mapping on {}'.format(_a))
 
@@ -229,8 +229,8 @@ def embed_symm(_c: System):
         for _ps in pairs_list:
             logger.debug(
                 "{}: {}: root {} and {}: map {}".format(
-                    _c.name,
-                    _a,
+                    c.name,
+                    a,
                     _ps["ref_root"],
                     _ps["tar_root"],
                     [[str(k) for k in i] for i in _ps["pair_list"]],
@@ -239,7 +239,7 @@ def embed_symm(_c: System):
 
         # generate matrix
         for _ps in pairs_list:
-            _mat = np.identity(len(_c.atoms))
+            _mat = np.identity(len(c.atoms))
             for ref_atom, tar_atom in _ps["pair_list"]:
                 _ref_idx = ref_atom.number - 1
                 _tar_idx = tar_atom.number - 1
@@ -247,7 +247,7 @@ def embed_symm(_c: System):
             _ps["pair_matrix"] = _mat
 
         if len(pairs_list) != 0:
-            _a.cache["isomeric_subs_list"] = [
+            a.cache["isomeric_subs_list"] = [
                 {
                     "root_a": _p["ref_root"],
                     "root_b": _p["tar_root"],
@@ -259,34 +259,34 @@ def embed_symm(_c: System):
 
     rotamer_mat_list = []
     numisomer_mat_list = []
-    for _a in _c.atoms:
-        if "isomeric_subs_list" not in _a.cache:
+    for a in c.atoms:
+        if "isomeric_subs_list" not in a.cache:
             continue
         # extract rotamers
-        if [len(_a.bonds), len(_a.cache["isomeric_subs_list"])] in [[2, 1], [3, 1]]:
+        if [len(a.bonds), len(a.cache["isomeric_subs_list"])] in [[2, 1], [3, 1]]:
             # aromatic handling should be included
-            if len(_a.double) != 0:
-                for double_bond_atom in _a.double:
+            if len(a.double) != 0:
+                for double_bond_atom in a.double:
                     if double_bond_atom in [
-                        _a.cache["isomeric_subs_list"][0]["root_a"],
-                        _a.cache["isomeric_subs_list"][0]["root_a"],
+                        a.cache["isomeric_subs_list"][0]["root_a"],
+                        a.cache["isomeric_subs_list"][0]["root_a"],
                     ]:
                         break
                 else:
-                    numisomer_mat_list.append(_a.cache["isomeric_subs_list"][0]["matrix"])
+                    numisomer_mat_list.append(a.cache["isomeric_subs_list"][0]["matrix"])
                     continue
-            rot_mat = _a.cache["isomeric_subs_list"][0]["matrix"]
+            rot_mat = a.cache["isomeric_subs_list"][0]["matrix"]
             rot_mat = rot_mat.astype(int)
             rotamer_mat_list.append(rot_mat)
-        elif [len(_a.bonds), len(_a.cache["isomeric_subs_list"])] in [[4, 3], [4, 6]]:
-            for _ps in _a.cache["isomeric_subs_list"][1:]:
-                rot_mat = np.dot(_ps["matrix"], _a.cache["isomeric_subs_list"][0]["matrix"])
+        elif [len(a.bonds), len(a.cache["isomeric_subs_list"])] in [[4, 3], [4, 6]]:
+            for _ps in a.cache["isomeric_subs_list"][1:]:
+                rot_mat = np.dot(_ps["matrix"], a.cache["isomeric_subs_list"][0]["matrix"])
                 rot_mat = rot_mat.astype(int)
                 rotamer_mat_list.append(rot_mat)
-            for _ps in _a.cache["isomeric_subs_list"]:
+            for _ps in a.cache["isomeric_subs_list"]:
                 numisomer_mat_list.append(_ps["matrix"])
         else:
-            for _ps in _a.cache["isomeric_subs_list"]:
+            for _ps in a.cache["isomeric_subs_list"]:
                 numisomer_mat_list.append(_ps["matrix"])
 
     # generate identical collections of rot_mat
@@ -308,16 +308,16 @@ def embed_symm(_c: System):
         return invalid_count
 
     # for TMS, cyclic_chiral_check has error
-    def _cyclic_chiral_check(_c: System, rotamer_mat_list, numisomer_mat_list):
+    def _cyclic_chiral_check(c: System, rotamer_mat_list, numisomer_mat_list):
         unchanged_flag = True
         for rot_mat in rotamer_mat_list:
-            original_xyz = np.array([at.xyz for at in _c.atoms])
-            number_of_invalid = _invalid_chirality(_c, np.dot(rot_mat, original_xyz))
+            original_xyz = np.array([at.xyz for at in c.atoms])
+            number_of_invalid = _invalid_chirality(c, np.dot(rot_mat, original_xyz))
             if number_of_invalid == 0:
                 continue
             for num_mat in numisomer_mat_list:
                 t_mat = np.dot(num_mat, rot_mat)
-                if _invalid_chirality(_c, np.dot(t_mat, original_xyz)) < number_of_invalid:
+                if _invalid_chirality(c, np.dot(t_mat, original_xyz)) < number_of_invalid:
                     rot_mat = t_mat
                     unchanged_flag = False
                     logger.debug(f"chirality in rotamer matrix was partially corrected: {rot_mat}")
@@ -328,21 +328,21 @@ def embed_symm(_c: System):
 
     if len(rotamer_mat_list) != 0:
         for _ in range(len(rotamer_mat_list)):
-            if _cyclic_chiral_check(_c, rotamer_mat_list, numisomer_mat_list):
-                logger.debug(f"{_c.name}: chirality in rotamer matrix was successfully corrected")
+            if _cyclic_chiral_check(c, rotamer_mat_list, numisomer_mat_list):
+                logger.debug(f"{c.name}: chirality in rotamer matrix was successfully corrected")
                 break
         else:
-            logger.error(f"{_c.name}: chirality in rotamer matrix was not completely corrected")
+            logger.error(f"{c.name}: chirality in rotamer matrix was not completely corrected")
 
     # generate identical collections of rot_mat again
     rotamer_mat_list = {_m.tobytes(): _m for _m in rotamer_mat_list}.values()
     numisomer_mat_list = {_m.tobytes(): _m for _m in numisomer_mat_list}.values()
 
     # added matrix property
-    _c.data["rotamer"] = [Matrix(_c.atoms.to_list()).bind(_m) for _m in rotamer_mat_list]
-    _c.data["numisomer"] = [Matrix(_c.atoms.to_list()).bind(_m) for _m in numisomer_mat_list]
+    c.data["rotamer"] = [Matrix(c.atoms.to_list()).bind(_m) for _m in rotamer_mat_list]
+    c.data["numisomer"] = [Matrix(c.atoms.to_list()).bind(_m) for _m in numisomer_mat_list]
 
-    _del_visited_flags(_c)
+    _del_visited_flags(c)
 
 
 def rmsdpruning(
@@ -475,53 +475,6 @@ def rmsdpruning(
                                 break
                             else:
                                 redundant_counter += 1
-
-
-# not coded yet
-def parse_angles(_c: System):
-    bonds = _c.bonds_list
-    ang_list = []
-    for i, bond in enumerate(bonds):
-        for atom in bond:
-            bonds_poped = bonds.copy()
-            bonds_poped.pop(i)
-            next_atoms = set(sum((b for b in bonds_poped if atom in b), []))
-            next_atoms.discard(atom)
-            next_atoms = list(next_atoms)
-            bond_i = bonds[i].copy()
-            bond_i.remove(atom)
-            ang_list.extend([[bond_i[0], atom, next_atom] for next_atom in next_atoms])
-    for ang in ang_list:
-        inv_ang = [ang[i] for i in reversed(range(3))]
-        ang_list.remove(inv_ang)
-    ang_list.sort()
-    _c.data["angles_list"] = ang_list
-
-
-# not coded yet
-def parse_dihedrals(_c: System):
-    bonds = _c.bonds_list
-    dih_list = []
-    for i, bond in enumerate(bonds):
-        for atom in bond:
-            bonds_poped = bonds.copy()
-            bonds_poped.pop(i)
-            next_atoms = set(sum((b for b in bonds_poped if atom in b), []))
-            next_atoms.discard(atom)
-            next_atoms = list(next_atoms)
-            bond_i = bonds[i].copy()
-            bond_i.remove(atom)
-            for next_atom in next_atoms:
-                next_bonds = [b for b in bonds if (next_atom in b) and (atom not in b)]
-                for next_bond in next_bonds:
-                    next_bond_copied = next_bond.copy()
-                    next_bond_copied.remove(next_atom)
-                    dih_list.append([bond_i[0], atom, next_atom, next_bond_copied[0]])
-    for dih in dih_list:
-        inv_dih = [dih[i] for i in reversed(range(4))]
-        dih_list.remove(inv_dih)
-    dih_list.sort()
-    _c.data["dihedrals_list"] = dih_list
 
 
 def map_numbers(confs: Systems, reference_confs: Systems):
