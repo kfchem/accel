@@ -110,7 +110,7 @@ def _embed_f_m_ct(c: System, f_m_ct: dict[str, Union[str, list]]):
         if a.charge is None:
             continue
         total_charge += a.charge
-    c.total_charge = total_charge
+    c.charge = total_charge
     for _m_bond in f_m_ct["m_bond"]:
         _number_a = int(_m_bond["i_m_from"])
         _number_b = int(_m_bond["i_m_to"])

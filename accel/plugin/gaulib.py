@@ -397,7 +397,8 @@ class GauBox(BoxCore):
         for c in self.get():
             with c.path.open() as f:
                 ls = f.readlines()
-
+            charge = None
+            multiplicity = None
             if source == "archive":
                 arc_sec = ""
                 for i, line in enumerate(ls):
@@ -412,7 +413,10 @@ class GauBox(BoxCore):
                     c.deactivate("read_atoms: g16")
                     continue
                 arc_sec = arc_sec.split("\\\\")
-                axyzs = [i.split(",") for i in arc_sec[3].split("\\")[1:]]
+                splitted_arc_sec = arc_sec[3].split("\\")
+                charge = int(splitted_arc_sec[0].split(",")[0])
+                multiplicity = int(splitted_arc_sec[0].split(",")[1])
+                axyzs = [i.split(",") for i in splitted_arc_sec[1:]]
                 if len(axyzs[0]) == 5:
                     for line in axyzs:
                         line.pop(1)
@@ -426,16 +430,22 @@ class GauBox(BoxCore):
                     "standard_orientation": "Standard orientation:",
                     "input_orientation": "Input orientation:",
                 }
-                line_number = 0
+                line_idx = None
+                chg_mult_idx = None
                 for i, line in enumerate(ls):
                     if key_words[source] in line:
-                        line_number = i
-                if line_number == 0:
+                        line_idx = i
+                    if "Charge =" in line:
+                        chg_mult_idx = i
+                if line_idx is None:
                     logger.error(f"could not find orientation section in {c.path.name}")
                     c.deactivate("read_atoms: g16")
                     continue
+                if chg_mult_idx is not None:
+                    charge = int(ls[chg_mult_idx].split()[2])
+                    multiplicity = int(ls[chg_mult_idx].split()[5])
                 axyzs = []
-                for line in ls[(line_number + 5) :]:
+                for line in ls[(line_idx + 5) :]:
                     if "---------------------------------------------------------------------" in line:
                         break
                     axyzs.append(line.split())
@@ -444,7 +454,11 @@ class GauBox(BoxCore):
             c.atoms.clear()
             for line in axyzs:
                 c.atoms.append(line)
-            logger.debug(f"read xyz of {c.path.name} from {source}")
+            if charge is not None:
+                c.charge = charge
+            if multiplicity is not None:
+                c.multiplicity = multiplicity
+            logger.debug(f"read {source} from {c.path.name}")
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -467,7 +481,7 @@ class GauBox(BoxCore):
             try:
                 if len(chg_mult) != 2:
                     raise ValueError
-                c.total_charge = int(chg_mult[0])
+                c.charge = int(chg_mult[0])
                 c.multiplicity = int(chg_mult[1])
                 uni_len = list({len(_l) for _l in atomic_coord})
                 if len(uni_len) != 1 or uni_len[0] != 4:

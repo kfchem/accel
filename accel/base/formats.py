@@ -141,7 +141,7 @@ def read_mol(_c: System):
         if _a.charge is None:
             continue
         _total_charge += _a.charge
-    _c.total_charge = _total_charge
+    _c.charge = _total_charge
     logger.debug(f"read {_c.name}")
 
 
