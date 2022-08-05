@@ -114,7 +114,7 @@ class System:
                 return None
 
     @charge.setter
-    def charge_setter(self, value):
+    def charge(self, value):
         self.total_charge = value
 
     def deactivate(self, reason: str = ""):
