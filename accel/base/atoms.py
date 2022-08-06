@@ -1,7 +1,7 @@
 import copy
 from collections import deque
 from collections.abc import MutableSequence
-from typing import Iterator, MutableMapping, Sequence, Set, Tuple
+from typing import Iterable, Iterator, MutableMapping, Sequence, Set, Tuple
 
 import numpy as np
 from accel.util.constants import Elements
@@ -45,43 +45,46 @@ class Atom:
         "data",
         "cache",
         "charge",
-        "_atoms",
+        "parent",
     ]
 
-    def __init__(self, parent: "Atoms" = None):
-        self._symbol: str = ""
-        self.x: float = 0.0
-        self.y: float = 0.0
-        self.z: float = 0.0
+    def __init__(self, symbol: str = None, x: float = 0.0, y: float = 0.0, z: float = 0.0, parent: "Atoms" = None):
+        if symbol is None:
+            self._symbol: str = ""
+        else:
+            self._symbol: str = Elements.canonicalize(symbol)
+        self.x: float = float(x)
+        self.y: float = float(y)
+        self.z: float = float(z)
         self.data = Data(self)
         self.cache = {}
         self.charge: int = None
-        self._atoms: Atoms = parent
+        self.parent: Atoms = parent
 
     def __str__(self):
-        if self._atoms is None:
+        if self.parent is None:
             return f"{self.symbol}({self.x}, {self.y}, {self.z})"
         else:
             return f"{self.number}{self.symbol}"
 
     @property
     def number(self):
-        if self._atoms is None:
+        if self.parent is None:
             logger.error(f"{self} has no parent atoms")
             return None
-        return self._atoms._list.index(self) + 1
+        return self.parent._list.index(self) + 1
 
     def _get_bonding_atom(self, bond_types: list[int]):
-        if self._atoms is None:
+        if self.parent is None:
             logger.error(f"{self} has no parent atoms")
             return []
-        if self._atoms.bonds is None:
-            logger.error(f"{self._atoms} has no bonding informations")
+        if self.parent.bonds is None:
+            logger.error(f"{self.parent} has no bonding informations")
             return []
         self_num = self.number
         bonds_list = [
-            self._atoms.get(_index + 1)
-            for _index, _b_type in enumerate(self._atoms.bonds._matrix[self_num - 1])
+            self.parent.get(_index + 1)
+            for _index, _b_type in enumerate(self.parent.bonds._matrix[self_num - 1])
             if _b_type in bond_types
         ]
         return bonds_list
@@ -148,7 +151,7 @@ class Atom:
         return self
 
     def duplicate(self, atoms=None) -> "Atom":
-        n = Atom(atoms)
+        n = Atom(parent=atoms)
         n._symbol = self._symbol
         n.x = self.x
         n.y = self.y
@@ -613,20 +616,35 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[Tuple[A
 class Atoms(MutableSequence):
     __slots__ = ["_list", "bonds"]
 
-    def __init__(self) -> None:
+    def __init__(self, contents: Iterable[Atom] = None) -> None:
         self._list: list[Atom] = []
         self.bonds: Bonds = None
+        if contents is None:
+            pass
+        elif isinstance(contents, Iterable):
+            for a in contents:
+                if isinstance(a, Atom):
+                    if a.parent is not None:
+                        self._list.append(a.duplicate(self))
+                        continue
+                    self._list.append(a)
+                elif isinstance(a, Sequence) and len(a) == 4:
+                    self._list.append(Atom(*a, parent=self))
+                else:
+                    logger.error("Atoms accepts only Iterable[Atom-like]")
+        else:
+            logger.error("Atoms accepts only Iterable[Atom-like]")
+            raise ValueError
 
     def _new_atom_instance(self, value) -> Atom:
         if isinstance(value, Atom):
-            if value._atoms is None:
+            if value.parent is None:
                 new_atom = value
             else:
                 new_atom = value.duplicate()
-            new_atom._atoms = self
+            new_atom.parent = self
         elif isinstance(value, Sequence) and len(value) == 4:
-            new_atom = Atom(self)
-            new_atom.axyz = value
+            new_atom = Atom(*value, parent=self)
         else:
             raise ValueError
         return new_atom
@@ -684,7 +702,7 @@ class Atoms(MutableSequence):
 
     def get_new_atom(self, value=None) -> Atom:
         if value is None:
-            new_atom = Atom(self)
+            new_atom = Atom(parent=self)
         else:
             new_atom = self._new_atom_instance(value)
         self._list.append(new_atom)
