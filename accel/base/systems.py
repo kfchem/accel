@@ -2,9 +2,10 @@ from collections import defaultdict
 from collections.abc import MutableSequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Iterator, Union
+from typing import Dict, Iterable, Iterator, Union
 
 from accel.base.atoms import Atoms
+from accel.base.modeler import Modeler
 from accel.util import FileType
 from accel.util.datadict import Data
 from accel.util.log import Log, logger
@@ -130,30 +131,34 @@ class System:
 
     def show(self):
         data_dict = {}
-        data_dict["Name"] = self.name
+        data_dict["name"] = self.name
         try:
             _path = self.path.relative_to(Path.cwd())
         except ValueError:
             _path = self.path.absolute()
-        data_dict["Path"] = _path
-        data_dict["FileType"] = self.filetype
+        data_dict["path"] = _path
+        data_dict["fileType"] = self.filetype
         if self.state:
-            data_dict["State"] = "ACTIVE"
+            data_dict["state"] = "ACTIVE"
         else:
-            data_dict["State"] = "INACTIVE"
-        data_dict["History"] = self.history
-        data_dict["Label"] = self.label
+            data_dict["state"] = "INACTIVE"
+        data_dict["history"] = self.history
+        data_dict["label"] = self.label
         if self.energy is None:
-            data_dict["Energy"] = "----- kcal/mol"
+            data_dict["energy"] = "----- kcal/mol"
         else:
-            data_dict["Energy"] = f"{self.energy:>5.1f} kcal/mol"
-        data_dict["Charge"] = self.charge
-        data_dict["Multiplicity"] = self.multiplicity
+            data_dict["energy"] = f"{self.energy:>5.1f} kcal/mol"
+        data_dict["charge"] = self.charge
+        data_dict["multiplicity"] = self.multiplicity
         for _key, _val in self.data._data.items():
-            data_dict[f"Data[{_key}]"] = _val
+            data_dict[f"data[{_key}]"] = _val
         for _key, _val in data_dict.items():
             logger.info(f"{self.name}: {_key}: {str(_val)}")
         return self
+
+    @property
+    def modeler(self) -> Modeler:
+        return Modeler(self.atoms)
 
     def duplicate(self) -> "System":
         n = System()
@@ -175,8 +180,21 @@ class System:
 class Systems(MutableSequence):
     __slots__ = ["_list"]
 
-    def __init__(self):
+    def __init__(self, contents: Iterable[System] = None):
         self._list: list[System] = []
+        if contents is None:
+            pass
+        elif isinstance(contents, Iterable):
+            for c in contents:
+                if isinstance(c, System):
+                    self._list.append(c)
+                elif isinstance(c, Path) or isinstance(c, str) :
+                    self._list.append(System(c))
+                else:
+                    logger.error("Systems accepts only Iterable[System-like]")
+        else:
+            logger.error("Systems accepts only Iterable[System-like]")
+            raise ValueError
 
     def _new_confomer(self, value: Union[System, Path, str]) -> System:
         if isinstance(value, System):
