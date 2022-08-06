@@ -37,15 +37,15 @@ def _add(content, boxcore: "BoxCore"):
 
 
 class BoxCore:
-    def __init__(self, files: Union[Iterable[Union[System, Path, str]], str, "BoxCore"] = None):
-        if isinstance(files, BoxCore):
-            self.contents = files.contents
-            self.data = files.data
+    def __init__(self, contents: Union[Iterable[Union[System, Path, str]], str, "BoxCore"] = None):
+        if isinstance(contents, BoxCore):
+            self.contents = contents.contents
+            self.data = contents.data
         else:
             self.contents: Systems = Systems()
             self.data = Data(self)
-            if files is not None:
-                _add(files, self)
+            if contents is not None:
+                _add(contents, self)
 
     def get(self, arg: Union[bool, str] = None) -> Systems:
         if arg is None:
@@ -504,15 +504,15 @@ class BoxCore:
         numbers_along_with_b: Sequence[int] = [],
     ):
         for c in self.get():
-            xyz.edit_bond_length(
-                c, number_a, number_b, target, (bool(fix_a), bool(fix_b)), numbers_along_with_a, numbers_along_with_b
+            c.modeler.set_length(
+                number_a, number_b, target, (bool(fix_a), bool(fix_b)), numbers_along_with_a, numbers_along_with_b
             )
         logger.debug(f"done: {str(self)}")
         return self
 
     def convert_to_mirror(self, centering: bool = True):
         for c in self.get():
-            xyz.convert_to_mirror(c, centering)
+            c.modeler.mirroring(centering)
         logger.debug(f"done: {str(self)}")
         return self
 
