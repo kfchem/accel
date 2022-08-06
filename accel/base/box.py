@@ -26,12 +26,12 @@ def adaptive_function_caller(box: "Box", selector: FuncSelector, filetype, **opt
 
 
 class Box(BoxCore):
-    def __init__(self, files: Iterable[Union[System, Path, str]] = None):
-        if isinstance(files, BoxCore):
-            self.contents = files.contents
-            self.data = files.data
+    def __init__(self, contents: Iterable[Union[System, Path, str]] = None):
+        if isinstance(contents, BoxCore):
+            self.contents = contents.contents
+            self.data = contents.data
         else:
-            super().__init__(files=files)
+            super().__init__(contents=contents)
 
     @property
     def plugin(self):
