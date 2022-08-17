@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import Iterable, Sequence, Union
 
 from accel.base import formats as formats
-from accel.base import text as text
 from accel.base import topology as topology
-from accel.base import xyz as xyz
 from accel.base.selector import Selectors
 from accel.base.systems import System, Systems
 from accel.base.tools import change_dir
@@ -343,16 +341,19 @@ class BoxCore:
 
     def write_input(self, template: Path, directory=None, link: bool = True, arg: dict[str, str] = None):
         for c in self.get():
-            text.write_input(c=c, template=template, odir=directory, link=link, arg=arg)
+            formats.write_input(c=c, template=template, odir=directory, link=link, arg=arg)
         Log.set_output_dir(directory)
         logger.debug(f"done: {str(self)}")
         return self
 
     def calc_bonds(self, cov_scaling: float = 1.1, vdw_scaling: float = 1.0, aromatize=True):
         for c in self.get():
-            topology.embed_bonds(c, cov_scaling, vdw_scaling)
+            logger.debug(f"{c.name}: calculating bonds")
+            c.modeler.calc_bonds(cov_scaling, vdw_scaling)
             if aromatize:
-                topology.aromatize(c)
+                c.modeler.aromatize()
+            else:
+                logger.debug(f"{c.name}: skipped aromatic bonds detection")
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -373,22 +374,24 @@ class BoxCore:
             cfs = self.get()
 
         if len(cfs) != len(cfs.has_bonds()):
-            logger.info("embed_bonds called automatically")
+            logger.info("calc_bonds called automatically")
             self.calc_bonds()
 
-        for _c in cfs:
-            topology.embed_symm(_c)
-            _c.data["has_symm"] = True
+        for c in cfs:
+            mats: list[Matrix] = c.modeler.get_symmetry_matrices()
+            c.data["rotamer"] = [mat for mat in mats if mat.data["type"] == "rotamer"]
+            c.data["numisomer"] = [mat for mat in mats if mat.data["type"] == "numisomer"]
+            c.data["has_symm"] = True
 
         if not calc_all:
             rot_mats_dict: dict[str, list[Matrix]] = {_c.label: _c.data["rotamer"] for _c in cfs}
             num_mats_dict: dict[str, list[Matrix]] = {_c.label: _c.data["numisomer"] for _c in cfs}
             for _label, _confs in self.get().labels.items():
-                for _c in _confs:
-                    atoms_list = _c.atoms.to_list()
-                    _c.data["rotamer"] = [Matrix(atoms_list).bind(_m._matrix) for _m in rot_mats_dict[_label]]
-                    _c.data["numisomer"] = [Matrix(atoms_list).bind(_m._matrix) for _m in num_mats_dict[_label]]
-                    _c.data["has_symm"] = True
+                for c in _confs:
+                    atoms_list = c.atoms.to_list()
+                    c.data["rotamer"] = [Matrix(atoms_list).bind(_m._matrix) for _m in rot_mats_dict[_label]]
+                    c.data["numisomer"] = [Matrix(atoms_list).bind(_m._matrix) for _m in num_mats_dict[_label]]
+                    c.data["has_symm"] = True
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -400,7 +403,7 @@ class BoxCore:
         all_perturbation_of_rotamers: bool = False,
     ):
         if len(self.get()) != len(self.get().has_data("has_symm", True)):
-            logger.info("embed_symm called automatically")
+            logger.info("calc_symm called automatically")
             self.calc_symm()
         topology.rmsdpruning(
             self.get(),
@@ -426,26 +429,61 @@ class BoxCore:
         number_a = int(number_a)
         number_b = int(number_b)
         for c in self.get():
-            xyz.calc_length(c, number_a, number_b, key)
+            if key == "" or not isinstance(key, str):
+                actual_key = "length_{}{}-{}{}".format(
+                    c.atoms.get(number_a).symbol,
+                    str(number_a),
+                    c.atoms.get(number_b).symbol,
+                    str(number_b),
+                )
+            else:
+                actual_key = key
+            c.data[actual_key] = c.atoms.get_length(number_a, number_b)
         logger.debug(f"done: {str(self)}")
         return self
 
-    def calc_dihedral(self, number_a: int, number_b: int, number_c: int, number_d: int, key: str = ""):
+    def calc_angle(self, number_a: int, number_b: int, number_c: int, key: str = "", radian: bool = False):
+        number_a = int(number_a)
+        number_b = int(number_b)
+        number_c = int(number_c)
+        for c in self.get():
+            if key == "" or not isinstance(key, str):
+                actual_key = "angle_{}{}-{}{}-{}{}".format(
+                    c.atoms.get(number_a).symbol,
+                    str(number_a),
+                    c.atoms.get(number_b).symbol,
+                    str(number_b),
+                    c.atoms.get(number_c).symbol,
+                    str(number_c),
+                )
+            else:
+                actual_key = key
+            c.data[actual_key] = c.atoms.get_angle(number_a, number_b, number_c, radian=radian)
+        logger.debug(f"done: {str(self)}")
+        return self
+
+    def calc_dihedral(
+        self, number_a: int, number_b: int, number_c: int, number_d: int, key: str = "", radian: bool = False
+    ):
         number_a = int(number_a)
         number_b = int(number_b)
         number_c = int(number_c)
         number_d = int(number_d)
         for c in self.get():
-            xyz.calc_dihedral(c, number_a, number_b, number_c, number_d, key)
-        logger.debug(f"done: {str(self)}")
-        return self
-
-    def calc_angle(self, number_a: int, number_b: int, number_c: int, key: str = ""):
-        number_a = int(number_a)
-        number_b = int(number_b)
-        number_c = int(number_c)
-        for _c in self.get():
-            xyz.calc_angle(_c, number_a, number_b, number_c, key)
+            if key == "" or not isinstance(key, str):
+                actual_key = "dihedral_{}{}-{}{}-{}{}-{}{}".format(
+                    c.atoms.get(number_a).symbol,
+                    str(number_a),
+                    c.atoms.get(number_b).symbol,
+                    str(number_b),
+                    c.atoms.get(number_c).symbol,
+                    str(number_c),
+                    c.atoms.get(number_d).symbol,
+                    str(number_d),
+                )
+            else:
+                actual_key = key
+            c.data[actual_key] = c.atoms.get_dihedral(number_a, number_b, number_c, number_d, radian=radian)
         logger.debug(f"done: {str(self)}")
         return self
 
@@ -504,6 +542,9 @@ class BoxCore:
         numbers_along_with_b: Sequence[int] = [],
     ):
         for c in self.get():
+            logger.info(
+                f"{c.name}: moving {c.atoms.get(number_a)} and {c.atoms.get(number_a)} to make their distance {target}"
+            )
             c.modeler.set_length(
                 number_a, number_b, target, (bool(fix_a), bool(fix_b)), numbers_along_with_a, numbers_along_with_b
             )
@@ -512,6 +553,7 @@ class BoxCore:
 
     def convert_to_mirror(self, centering: bool = True):
         for c in self.get():
+            logger.info(f"{c.name}: converting to mirror image")
             c.modeler.mirroring(centering)
         logger.debug(f"done: {str(self)}")
         return self

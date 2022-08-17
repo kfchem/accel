@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from accel.base.boxcore import BoxCore
-from accel.base.text import replace_key
+from accel.base.formats import replace_key
 from accel.base.tools import change_dir
 from accel.util.log import logger
 

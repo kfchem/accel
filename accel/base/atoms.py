@@ -1,5 +1,5 @@
 import copy
-from collections import deque
+import math
 from collections.abc import MutableSequence
 from typing import Iterable, Iterator, MutableMapping, Sequence, Set, Tuple
 
@@ -265,354 +265,6 @@ class Bonds(MutableMapping):
         return self
 
 
-def _get_maps(
-    atoms_a: "Atoms",
-    atoms_b: "Atoms",
-    known_pairs: list[Tuple[int]] = [],
-    exclude_known: bool = False,
-    terminal_first: bool = False,
-) -> list[list[Tuple[Atom]]]:
-
-    if len(known_pairs) == 0:
-        known_check = False
-        given_known_as = []
-        given_known_bs = []
-    else:
-        known_check = True
-        given_known_as = [atoms_a.get(pr[0]) for pr in known_pairs]
-        given_known_bs = [atoms_b.get(pr[1]) for pr in known_pairs]
-        if None in given_known_as or None in given_known_bs:
-            logger.error(f"invalid known_pairs: {known_pairs}")
-            return []
-
-    def _should_exclude(atom_a: Atom, atom_b: Atom):
-        if atom_a in given_known_as and atom_b in given_known_bs:
-            if given_known_as.index(atom_a) == given_known_bs.index(atom_b):
-                if exclude_known:
-                    return True
-            else:
-                return True
-        elif atom_a in given_known_as or atom_b in given_known_bs:
-            return True
-        return False
-
-    initial_pairs: list[Tuple[Atom]] = []
-
-    if terminal_first:
-        for atom_a in atoms_a:
-            if atom_a.symbol == "H":
-                continue
-            for atom_b in atoms_b:
-                if atom_b.symbol == "H":
-                    continue
-                if atom_a.symbol != atom_b.symbol:
-                    continue
-                if known_check:
-                    if _should_exclude(atom_a, atom_b):
-                        continue
-                if len([_a for _a in atom_a.bonds if _a.symbol != "H"]) > 1:
-                    if len([_b for _b in atom_b.bonds if _b.symbol != "H"]) > 1:
-                        continue
-                initial_pairs.append((atom_a, atom_b))
-
-    if len(initial_pairs) == 0:
-        for atom_a in atoms_a:
-            if atom_a.symbol == "H":
-                continue
-            for atom_b in atoms_b:
-                if atom_b.symbol == "H":
-                    continue
-                if atom_a.symbol != atom_b.symbol:
-                    continue
-                if len([_a for _a in atom_a.bonds if _a.symbol == "H"]) != len(
-                    [_b for _b in atom_b.bonds if _b.symbol == "H"]
-                ):
-                    continue
-                if known_check:
-                    if _should_exclude(atom_a, atom_b):
-                        continue
-                initial_pairs.append((atom_a, atom_b))
-
-    if len(initial_pairs) == 0:
-        for atom_a in atoms_a:
-            if atom_a.symbol == "H":
-                continue
-            for atom_b in atoms_b:
-                if atom_b.symbol == "H":
-                    continue
-                if atom_a.symbol != atom_b.symbol:
-                    continue
-                if known_check:
-                    if _should_exclude(atom_a, atom_b):
-                        continue
-                initial_pairs.append((atom_a, atom_b))
-
-    if len(initial_pairs) == 0:
-        appended_known_idxs = None
-        for atom_a in atoms_a:
-            for atom_b in atoms_b:
-                if known_check:
-                    if _should_exclude(atom_a, atom_b):
-                        continue
-                    known_a_idxs = [given_known_as.index(_a) for _a in atom_a.bonds if _a in given_known_as]
-                    known_a_idxs = sorted(known_a_idxs)
-                    known_b_idxs = [given_known_bs.index(_b) for _b in atom_b.bonds if _b in given_known_bs]
-                    known_b_idxs = sorted(known_b_idxs)
-                    if len(known_a_idxs) == 0 or len(known_b_idxs) == 0:
-                        continue
-                    if known_a_idxs == known_b_idxs:
-                        if appended_known_idxs is None or appended_known_idxs == known_a_idxs:
-                            appended_known_idxs = known_a_idxs
-                            initial_pairs.append((atom_a, atom_b))
-
-    if len(initial_pairs) == 0:
-        for atom_a in atoms_a:
-            for atom_b in atoms_b:
-                if known_check:
-                    if _should_exclude(atom_a, atom_b):
-                        continue
-                if len(atom_a.bonds) == 0 and len(atom_b.bonds) == 0:
-                    initial_pairs.append((atom_a, atom_b))
-
-    if len(initial_pairs) == 0:
-        for atom_a in atoms_a:
-            for atom_b in atoms_b:
-                if known_check:
-                    if _should_exclude(atom_a, atom_b):
-                        continue
-                initial_pairs.append((atom_a, atom_b))
-
-    def _isproper_bonding(atom_a: Atom, atom_b: Atom, side_pairs: list[Tuple[Atom]]):
-        atom_a_bonds = atom_a.bonds
-        atom_b_bonds = atom_b.bonds
-        # shoud swap here
-        if len(atom_a_bonds) != len(atom_b_bonds):
-            return True
-        # and here
-        if len([a for a in atom_a_bonds if a.symbol == "H"]) != len([a for a in atom_b_bonds if a.symbol == "H"]):
-            return False
-        a_side_pairs = [_ab[0] for _ab in side_pairs]
-        b_side_pairs = [_ab[1] for _ab in side_pairs]
-        a_index_list = sorted([a_side_pairs.index(_a) for _a in atom_a_bonds if _a in a_side_pairs])
-        b_index_list = sorted([b_side_pairs.index(_a) for _a in atom_b_bonds if _a in b_side_pairs])
-        if a_index_list != b_index_list:
-            return False
-        return True
-
-    initial_chains: list[list[Tuple[Atom]]] = [[]]
-    for initial_pair in initial_pairs:
-        stack = [[initial_pair]]
-        while stack:
-            side_pairs: list[Tuple[Atom]] = stack.pop()
-            if len(side_pairs) > len(initial_chains[-1]):
-                initial_chains = [side_pairs]
-                logger.debug(f"initial_chains updated: {[(pr[0].number, pr[1].number) for pr in side_pairs]}")
-            elif len(side_pairs) == len(initial_chains[-1]):
-                initial_chains.append(side_pairs)
-                logger.debug(f"initial_chains appended: {[(pr[0].number, pr[1].number) for pr in side_pairs]}")
-            a_list = [pr[0] for pr in side_pairs]
-            b_list = [pr[1] for pr in side_pairs]
-            for next_a in side_pairs[-1][0].bonds:
-                if next_a.symbol == "H" or next_a in a_list:
-                    continue
-                for next_b in side_pairs[-1][1].bonds:
-                    if next_b.symbol == "H" or next_b in b_list:
-                        continue
-                    if next_a.symbol != next_b.symbol:
-                        continue
-                    if known_check:
-                        if _should_exclude(next_a, next_b):
-                            continue
-                    if not _isproper_bonding(next_a, next_b, side_pairs):
-                        continue
-                    stack.append(side_pairs + [(next_a, next_b)])
-
-    if len(initial_chains) == 1 and len(initial_chains[0]) == 0:
-        return []
-
-    canonical_initial_chains: dict[list[set], Tuple[Tuple[Atom]]] = {}
-    for chain in initial_chains:
-        key = tuple(sorted([(pr[0].number, pr[1].number) for pr in chain], key=lambda t: t[0]))
-        canonical_initial_chains[key] = chain
-
-    for chain in canonical_initial_chains.values():
-        logger.debug(f"canonical_initial_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
-
-    min_invalid = None
-    h_matched_chains: list[list[Tuple[Atom]]] = [[]]
-    for chain in canonical_initial_chains.values():
-        invalid_atoms = 0
-        for pair in chain:
-            hs_of_a = [a_ for a_ in pair[0].bonds if a_.symbol == "H"]
-            hs_of_b = [b_ for b_ in pair[1].bonds if b_.symbol == "H"]
-            if len(hs_of_a) != len(hs_of_b):
-                invalid_atoms += 1
-        if min_invalid is None or min_invalid > invalid_atoms:
-            h_matched_chains = [chain]
-            min_invalid = invalid_atoms
-        elif min_invalid == invalid_atoms:
-            h_matched_chains.append(chain)
-
-    for chain in h_matched_chains:
-        logger.debug(f"h_matched_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
-
-    def _det_ez(a: Atom, b: Atom, c: Atom, d: Atom) -> bool:
-        vab = np.array(a.xyz) - np.array(b.xyz)
-        vcb = np.array(c.xyz) - np.array(b.xyz)
-        vdc = np.array(d.xyz) - np.array(c.xyz)
-        pvac = np.cross(vab, vcb)
-        pvbd = np.cross(vdc, vcb)
-        angle = np.arccos(np.sum(pvac * pvbd) / (np.linalg.norm(pvac) * np.linalg.norm(pvbd)))
-        if np.sum(pvac * np.cross(pvbd, vcb)) < 0:
-            angle = -angle
-        angle = float(np.rad2deg(angle))
-        if angle > 90 or angle < -90:
-            return True
-        return False
-
-    def _det_chirality(a: Atom, b: Atom, c: Atom, d: Atom) -> bool:
-        neighbors_xyz = np.array([atom_.xyz for atom_ in [b, c, d]]) - np.array(a.xyz)
-        if np.linalg.det(neighbors_xyz) > 0:
-            return True
-        return False
-
-    extended_chains: list[list[Tuple[Atom]]] = []
-    for chain in h_matched_chains:
-        stack = deque([pr for pr in chain])
-        assigned_as = given_known_as + [pr[0] for pr in chain]
-        assigned_bs = given_known_bs + [pr[1] for pr in chain]
-
-        def _new_assign(new_pair: Tuple[Atom], root_pair: Tuple[Atom]):
-            assigned_as.append(new_pair[0])
-            assigned_bs.append(new_pair[1])
-            stack.append((new_pair[0], new_pair[1]))
-            stack.appendleft(root_pair)
-
-        def _get_large(atoms: list[Atom]) -> list[Atom]:
-            trees = [[{_a}] for _a in atoms]
-            for _ in range(16):
-                for tree in trees:
-                    tree.append(set())
-                    for _a in tree[-2]:
-                        tree[-1].update(_a.bonds)
-
-                dup_atoms = trees[0][-1]
-                for tree in trees:
-                    dup_atoms = dup_atoms & tree[-1]
-                for tree in trees:
-                    tree[-1] = tree[-1] - dup_atoms
-                weights = []
-                for tree in trees:
-                    weights.append(len(tree[-1]))
-                if max(weights) == 0:
-                    return [list(tree[0])[0] for tree in trees]
-                alive_trees = []
-                for tree_idx, weight in enumerate(weights):
-                    if weight == max(weights):
-                        alive_trees.append(trees[tree_idx])
-                if len(alive_trees) == 1:
-                    return list(alive_trees[0][0])
-                trees = alive_trees
-            else:
-                return [list(tree[0])[0] for tree in alive_trees]
-
-        while stack:
-            root_pair: Tuple[Atom] = stack.popleft()
-            next_as = [_a for _a in root_pair[0].bonds if _a not in assigned_as]
-            next_bs = [_b for _b in root_pair[1].bonds if _b not in assigned_bs]
-            if len(next_as) == 0 or len(next_bs) == 0:
-                continue
-            a_sbls = [_a.symbol for _a in next_as]
-            b_sbls = [_b.symbol for _b in next_bs]
-
-            mono_subs = [_s for _s in a_sbls if a_sbls.count(_s) == 1 and b_sbls.count(_s) == 1]
-            if len(mono_subs) >= 1:
-                _new_assign((next_as[a_sbls.index(mono_subs[0])], next_bs[b_sbls.index(mono_subs[0])]), root_pair)
-                continue
-
-            tri_subs = [_s for _s in a_sbls if a_sbls.count(_s) >= 3 and b_sbls.count(_s) >= 3]
-            if len(tri_subs) >= 1:
-                large_as = _get_large([_a for _a in next_as if _a.symbol == tri_subs[0]])
-                large_bs = _get_large([_b for _b in next_bs if _b.symbol == tri_subs[0]])
-                _new_assign((large_as[0], large_bs[0]), root_pair)
-                continue
-
-            di_subs = [_s for _s in a_sbls if min(a_sbls.count(_s), b_sbls.count(_s)) == 2]
-            if len(di_subs) >= 1:
-                large_as = _get_large([_a for _a in next_as if _a.symbol == di_subs[0]])
-                large_bs = _get_large([_b for _b in next_bs if _b.symbol == di_subs[0]])
-                if len(large_as) == 1 and len(large_bs) == 1:
-                    _new_assign((large_as[0], large_bs[0]), root_pair)
-                    continue
-                if len(large_as) == 1 or len(large_bs) == 1:
-                    continue
-                known_as = [_a for _a in root_pair[0].bonds if _a in assigned_as]
-                corre_bs = [assigned_bs[assigned_as.index(_a)] for _a in known_as]
-                known_bs = [_b for _b in root_pair[1].bonds if _b in assigned_bs]
-                if len(known_as) == 2 and len(known_bs) == 2:
-                    flag_a = _det_chirality(known_as[0], known_as[1], large_as[0], large_as[1])
-                    flag_b = _det_chirality(corre_bs[0], corre_bs[1], large_bs[0], large_bs[1])
-                    if flag_a is flag_b:
-                        _new_assign((large_as[0], large_bs[0]), root_pair)
-                    else:
-                        _new_assign((large_as[0], large_bs[1]), root_pair)
-                    continue
-                if len(known_as) == 1 and len(known_bs) == 1:
-                    two_bond_pair = None
-                    for _a in [_a for _a in known_as[0].bonds if _a in assigned_as and _a != root_pair[0]]:
-                        for _b in [_b for _b in corre_bs[0].bonds if _b in assigned_bs and _b != root_pair[1]]:
-                            if assigned_as.index(_a) == assigned_bs.index(_b):
-                                two_bond_pair = (_a, _b)
-                                break
-                    if two_bond_pair is None:
-                        continue
-                    flag_a = _det_ez(two_bond_pair[0], known_as[0], root_pair[0], large_as[0])
-                    flag_b = _det_ez(two_bond_pair[1], corre_bs[0], root_pair[1], large_bs[0])
-                    if flag_a is flag_b:
-                        _new_assign((large_as[0], large_bs[0]), root_pair)
-                    else:
-                        _new_assign((large_as[0], large_bs[1]), root_pair)
-                    continue
-
-        extended_chains.append([(_a, _b) for _a, _b in zip(assigned_as, assigned_bs)])
-
-    canonical_extended_chains: dict[Tuple[Tuple[int]], list[Tuple[Atom]]] = {}
-    for chain in extended_chains:
-        key = tuple(sorted([(pr[0].number, pr[1].number) for pr in chain], key=lambda t: t[0]))
-        canonical_extended_chains[key] = chain
-
-    for chain in canonical_extended_chains.values():
-        logger.debug(f"canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
-
-    recursive_extended_chains: list[list[Tuple[Atom]]] = []
-    for chain in canonical_extended_chains.values():
-        if len(chain) < min(len(atoms_a), len(atoms_b)):
-            new_maps = _get_maps(atoms_a, atoms_b, known_pairs=chain, exclude_known=True, terminal_first=False)
-            if len(new_maps) == 0:
-                recursive_extended_chains.append(chain)
-            else:
-                for new_map in new_maps:
-                    recursive_extended_chains.append(chain + new_map)
-        else:
-            recursive_extended_chains.append(chain)
-
-    canonical_recursive_extended_chains: dict[Tuple[Tuple[int]], list[Tuple[Atom]]] = {}
-    for chain in recursive_extended_chains:
-        if exclude_known:
-            chain = chain[len(known_pairs) :]
-        key = tuple(sorted([(pr[0].number, pr[1].number) for pr in chain], key=lambda t: t[0]))
-        canonical_recursive_extended_chains[key] = chain
-
-    for chain in canonical_recursive_extended_chains.values():
-        logger.debug(f"canonical_recursive_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
-
-    return canonical_recursive_extended_chains.values()
-
-
-def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[Tuple[Atom]]]) -> list[list[Tuple[Atom]]]:
-    return atom_maps
-
-
 class Atoms(MutableSequence):
     __slots__ = ["_list", "bonds"]
 
@@ -741,6 +393,7 @@ class Atoms(MutableSequence):
             logger.error(f"could not add bond between {number_a} and {number_b}")
             raise ValueError
         self.bonds[number_a, number_b] = bond_type
+        return self
 
     @property
     def mw(self) -> float:
@@ -762,100 +415,40 @@ class Atoms(MutableSequence):
         self._list = value
         return self
 
-    def get_maps(
-        self,
-        target: "Atoms",
-        known_pairs: list[Tuple[int]] = [],
-        terminal_first: bool = False,
-    ) -> list[list[int]]:
-        atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
-        atoms_map = _order_maps(target, self, atoms_map)
-        for chain in atoms_map:
-            logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
-        return_chains = []
-        for chain in atoms_map:
-            chain_target = [pr[0] for pr in chain]
-            chain_self = [pr[1] for pr in chain]
-            return_nums = []
-            for atom_self in self:
-                try:
-                    atom_target = chain_target[chain_self.index(atom_self)]
-                    return_nums.append(atom_target.number)
-                except ValueError:
-                    return_nums.append(0)
-            return_chains.append(return_nums)
-        return return_chains
+    def get_length(self, number_a: int, number_b: int) -> float:
+        a_ = self.get(number_a).xyz
+        b_ = self.get(number_b).xyz
+        d_ = [float(a_[i]) - float(b_[i]) for i in range(3)]
+        return math.sqrt(sum(x**2 for x in d_))
 
-    def get_mapped(
-        self,
-        target: "Atoms",
-        known_pairs: list[Tuple[int]] = [],
-        terminal_first: bool = False,
-    ) -> list["Atoms"]:
-        atoms_map = _get_maps(target, self, known_pairs=known_pairs, terminal_first=terminal_first)
-        atoms_map = _order_maps(target, self, atoms_map)
-        for chain in atoms_map:
-            logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
-        return_list = []
-        for chain in atoms_map:
-            chain_target = [pr[0] for pr in chain]
-            chain_self = [pr[1] for pr in chain]
-            return_atoms = Atoms()
-            mapped_numbers = []
-            for atom_target in target:
-                try:
-                    atom_self = chain_self[chain_target.index(atom_target)]
-                except ValueError:
-                    logger.error("could not map atoms properly")
-                    return []
-                return_atoms.append(atom_self)
-                mapped_numbers.append(atom_self.number)
-            if self.has_bonds():
-                return_atoms.init_bonds()
-                for fromto, val in self.bonds.to_dict().items():
-                    try:
-                        _from = mapped_numbers.index(fromto[0]) + 1
-                        _to = mapped_numbers.index(fromto[1]) + 1
-                    except ValueError:
-                        continue
-                    return_atoms.bonds[_from, _to] = val
-            return_list.append(return_atoms)
-        return return_list
+    def get_angle(self, number_a: int, number_b: int, number_c: int, radian=False) -> float:
+        va = np.array(self.get(number_a).xyz)
+        vb = np.array(self.get(number_b).xyz)
+        vc = np.array(self.get(number_c).xyz)
+        vba = vb - va
+        vbc = vb - vc
+        dba = np.linalg.norm(vba)
+        dbc = np.linalg.norm(vbc)
+        angle = np.arccos(np.sum(vba * vbc) / (dba * dbc))
+        if not radian:
+            angle = np.rad2deg(angle)
+        return float(angle)
 
-    def get_splitted(self) -> list["Atoms"]:
-        atom_ll: list[list[int]] = [[_a.number] for _a in self._list]
-        bonding_types = [
-            BondType.single,
-            BondType.double,
-            BondType.triple,
-            BondType.aromatic,
-            BondType.single_or_double,
-            BondType.single_or_aromatic,
-            BondType.double_or_aromatic,
-        ]
-        for _bond, _type in self.bonds.to_dict().items():
-            if _type not in bonding_types:
-                continue
-            new_l = []
-            for atom_l in atom_ll:
-                if _bond[0] in atom_l or _bond[1] in atom_l:
-                    new_l.extend(atom_l)
-                    atom_l.clear()
-            atom_ll.append(new_l)
-        atom_ll: list[list[int]] = [sorted(list(atom_l)) for atom_l in atom_ll if atom_l != []]
-        ret_list: list["Atoms"] = []
-        for atom_nums in atom_ll:
-            return_atoms = Atoms()
-            for _num in atom_nums:
-                return_atoms.append(self.get(_num))
-            if self.has_bonds():
-                return_atoms.init_bonds()
-                for fromto, val in self.bonds.to_dict().items():
-                    try:
-                        _from = atom_nums.index(fromto[0]) + 1
-                        _to = atom_nums.index(fromto[1]) + 1
-                    except ValueError:
-                        continue
-                    return_atoms.bonds[_from, _to] = val
-            ret_list.append(return_atoms)
-        return ret_list
+    def get_dihedral(self, number_a: int, number_b: int, number_c: int, number_d: int, radian=False) -> float:
+        va = np.array(self.get(number_a).xyz)
+        vb = np.array(self.get(number_b).xyz)
+        vc = np.array(self.get(number_c).xyz)
+        vd = np.array(self.get(number_d).xyz)
+        vab = va - vb
+        vcb = vc - vb
+        vdc = vd - vc
+        pvac = np.cross(vab, vcb)
+        pvbd = np.cross(vdc, vcb)
+        dac = np.linalg.norm(pvac)
+        dbd = np.linalg.norm(pvbd)
+        angle = np.arccos(np.sum(pvac * pvbd) / (dac * dbd))
+        if np.sum(pvac * np.cross(pvbd, vcb)) < 0:
+            angle = -angle
+        if not radian:
+            angle = np.rad2deg(angle)
+        return float(angle)

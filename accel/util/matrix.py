@@ -2,16 +2,18 @@ from copy import deepcopy
 from typing import Any
 
 import numpy as np
+from accel.util.datadict import Data
 from accel.util.log import logger
 
 
 class Matrix:
-    __slots__ = ["indexes", "_matrix", "symmetric"]
+    __slots__ = ["indexes", "_matrix", "symmetric", "data"]
 
     def __init__(self, indexes: list[Any]) -> None:
         self.indexes: list[Any] = indexes
         self._matrix: np.ndarray = None
         self.symmetric: bool = False
+        self.data: Data = Data(self)
 
     def bind(self, ndarray: np.ndarray) -> "Matrix":
         if ndarray.shape == (len(self.indexes), len(self.indexes)):

@@ -1,348 +1,10 @@
 import itertools
-from collections import defaultdict
 
 import numpy as np
-from accel.base.atoms import Atom, Atoms, BondType
+from accel.base.atoms import Atom, Atoms
 from accel.base.systems import System, Systems
-from accel.util.constants import Elements
 from accel.util.log import logger
 from accel.util.matrix import Matrix
-
-
-def aromatize(c: System, single_threshold: int = 1.01, double_threshold: int = 1.01, max_depth: int = 18):
-    a_list = c.atoms.to_list()
-    npxyz = [[a.x, a.y, a.z] for a in a_list]
-    npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
-    npdist_mat = np.sqrt(np.sum(npdist_mat**2, axis=-1))
-
-    npcov = [Elements.get_element(_a.symbol)["single"] for _a in a_list]
-    npcov = [_v if _v is not None else np.nan for _v in npcov]
-    npcov_mat = np.expand_dims(npcov, axis=1) + np.expand_dims(npcov, axis=0)
-    npcov_mat = np.signbit(npdist_mat - single_threshold * npcov_mat)
-    # single_threshold should be like 0.9 to reduce calculation cost
-
-    npdbl = [Elements.get_element(_a.symbol)["double"] for _a in a_list]
-    npdbl = [_v if _v is not None else np.nan for _v in npdbl]
-    npdbl_mat = np.expand_dims(npdbl, axis=1) + np.expand_dims(npdbl, axis=0)
-    npdbl_mat = np.signbit((double_threshold * npdbl_mat) - npdist_mat)
-    # double_threshold should be like 1.1 to reduce calculation cost
-
-    aromatic_mat: list[list[bool]] = (npcov_mat & npdbl_mat).tolist()
-
-    def path_to_other(start_idx: int, end_idx: int, route: list[int], ring_list: list[list[int]]):
-        route = route + [start_idx]
-        for other_idx in [_idx for _idx, _flag in enumerate(aromatic_mat[start_idx]) if _flag is True]:
-            if other_idx == end_idx and other_idx != route[-2]:
-                ring_list.append(route)
-                continue
-            if other_idx in route:
-                continue
-            if len(route) > max_depth:
-                continue
-            path_to_other(other_idx, end_idx, route, ring_list)
-
-    aromatic_atom = [False for _ in range(len(a_list))]
-    aromatic_rings = []
-    for cheking_idx in range(len(a_list)):
-        if aromatic_atom[cheking_idx]:
-            continue
-        ring_list = []
-        path_to_other(cheking_idx, cheking_idx, [], ring_list)
-        if len(ring_list) == 0:
-            continue
-        for ring in ring_list:
-            electrons = 0
-            for atom_idx in ring:
-                _symbol = c.atoms[atom_idx].symbol
-                if _symbol == "C":
-                    electrons += 1
-                elif _symbol == "O":
-                    electrons += 2
-                elif _symbol == "S":
-                    electrons += 2
-                elif _symbol == "N":
-                    if len(c.atoms[atom_idx].bonds) == 3:
-                        electrons += 2
-                    else:
-                        electrons += 1
-                else:
-                    electrons += 1
-            if ((electrons - 2) % 4) != 0:
-                continue
-            # check planer
-            for _idx in ring:
-                aromatic_atom[_idx] = True
-            aromatic_rings.append(ring)
-    aromatic_bonds_set = set()
-    for ring in aromatic_rings:
-        for _id in range(len(ring) - 1):
-            aromatic_bonds_set.add((ring[_id], ring[_id + 1]))
-        aromatic_bonds_set.add((ring[0], ring[-1]))
-    aromatic_bonds_set = {(id_a, id_b) for id_a, id_b in aromatic_bonds_set if id_a < id_b}
-
-    for id_a, id_b in aromatic_bonds_set:
-        c.atoms.bonds[id_a + 1, id_b + 1] = BondType.aromatic
-
-
-def embed_bonds(c: System, cov_scaling=1.1, vdw_scaling=1.0, double_scaling=1.05, triple_scaling=1.05):
-    a_list = c.atoms.to_list()
-    npxyz = [[_a.x, _a.y, _a.z] for _a in a_list]
-    npdist_mat = np.expand_dims(npxyz, axis=1) - np.expand_dims(npxyz, axis=0)
-    npdist_mat = np.sqrt(np.sum(npdist_mat**2, axis=-1))
-
-    npcov = [Elements.get_element(_a.symbol)["single"] for _a in a_list]
-    npcov = [_v if _v is not None else np.nan for _v in npcov]
-    npcov_mat = np.expand_dims(npcov, axis=1) + np.expand_dims(npcov, axis=0)
-    npcov_mat = np.signbit(npdist_mat - cov_scaling * npcov_mat)
-
-    npvdw = [Elements.get_element(_a.symbol)["vdw"] for _a in a_list]
-    npvdw = [_v if _v is not None else np.nan for _v in npvdw]
-    npvdw_mat = np.expand_dims(npvdw, axis=1) + np.expand_dims(npvdw, axis=0)
-    npvdw_mat = np.signbit(npdist_mat - vdw_scaling * npvdw_mat) ^ npcov_mat
-
-    npdbl = [Elements.get_element(_a.symbol)["double"] for _a in a_list]
-    npdbl = [_v if _v is not None else np.nan for _v in npdbl]
-    npdbl_mat = np.expand_dims(npdbl, axis=1) + np.expand_dims(npdbl, axis=0)
-    npdbl_mat = np.signbit(npdist_mat - double_scaling * npdbl_mat)
-
-    nptri = [Elements.get_element(_a.symbol)["triple"] for _a in a_list]
-    nptri = [_v if _v is not None else np.nan for _v in nptri]
-    nptri_mat = np.expand_dims(nptri, axis=1) + np.expand_dims(nptri, axis=0)
-    nptri_mat = np.signbit(npdist_mat - triple_scaling * nptri_mat)
-
-    npsgl_mat = npcov_mat ^ npdbl_mat
-    npdbl_mat = npdbl_mat ^ nptri_mat
-
-    mat_dict: dict[int, np.ndarray] = {
-        BondType.single: npsgl_mat,
-        BondType.double: npdbl_mat,
-        BondType.triple: nptri_mat,
-        BondType.contact: npvdw_mat,
-    }
-
-    c.atoms.init_bonds()
-
-    for _tyep, _mat in mat_dict.items():
-        for index_a in range(len(a_list)):
-            for index_b in range(len(a_list)):
-                if index_a >= index_b:
-                    continue
-                if _mat[index_a, index_b]:
-                    c.atoms.bonds[index_a + 1, index_b + 1] = _tyep
-
-    logger.debug(f"bonding information of {c.name} was embeded")
-
-
-def embed_symm(c: System):
-    def _reset_visited_flags(c: System):
-        for a in c.atoms:
-            a.cache["unvisited"] = True
-            a.cache["ref_unvisited"] = True
-        return None
-
-    def _del_visited_flags(c: System):
-        for a in c.atoms:
-            del a.cache["unvisited"]
-            del a.cache["ref_unvisited"]
-        return None
-
-    _reset_visited_flags(c)
-    for a in c.atoms:
-        # generate tree by BFS
-        atom_trees = []
-        for root in a.bonds:
-            a.cache["unvisited"] = False
-            prop_tree = defaultdict(list)
-            stack = []
-            stack.append([root, 0])
-            while not (stack == []):
-                poped_stack = stack.pop(0)
-                node: Atom = poped_stack[0]
-                distance: int = poped_stack[1]
-                node.cache["unvisited"] = False
-                prop_tree[distance].append(node)
-                if node.symbol == "H":
-                    continue
-                for _nb in node.bonds:
-                    if _nb.cache["unvisited"]:
-                        stack.append([_nb, distance + 1])
-            _reset_visited_flags(c)
-            prop_list = []
-            for distance in sorted(prop_tree.keys()):
-                prop = defaultdict(int)
-                for node in prop_tree[distance]:
-                    prop["bonds"] += len(node.bonds)
-                    prop[node.symbol] += 1
-                prop_list.append(dict(prop))
-            atom_trees.append({"root_atom": root, "prop_list": prop_list})
-        # logger.debug('BFS on {}'.format(_a))
-
-        # generate candidates of pair of isomorphic tree
-        candidate_pair = []
-        for idx_ref, tree_ref in enumerate(atom_trees):
-            for idx_target, tree_target in enumerate(atom_trees[idx_ref + 1 :], idx_ref + 1):
-                for prop_ref, prop_target in zip(tree_ref["prop_list"], tree_target["prop_list"]):
-                    for _key in prop_ref:
-                        if prop_ref[_key] != prop_target.get(_key):
-                            break
-                    else:
-                        continue
-                    break
-                else:
-                    candidate_pair.append({"ref_root": tree_ref["root_atom"], "tar_root": tree_target["root_atom"]})
-        # logger.debug('generated candidates of atom mapping on {}'.format(_a))
-
-        # check candidates by DFS
-        def recursive_dfs(node_ref: Atom, node_tar: Atom, pair_atoms: list):
-            if (node_ref.symbol != node_tar.symbol) or (len(node_ref.bonds) != len(node_tar.bonds)):
-                return False
-            node_ref.cache["ref_unvisited"] = False
-            node_tar.cache["unvisited"] = False
-            if node_ref == node_tar:
-                return True
-            for _nb_ref in [_n for _n in node_ref.bonds if _n.cache["ref_unvisited"]]:
-                if not _nb_ref.cache["ref_unvisited"]:
-                    break
-                for _nb_tar in [_n for _n in node_tar.bonds if _n.cache["unvisited"]]:
-                    if not _nb_tar.cache["unvisited"]:
-                        break
-                    if recursive_dfs(_nb_ref, _nb_tar, pair_atoms):
-                        break
-                else:
-                    node_ref.cache["ref_unvisited"] = True
-                    node_tar.cache["unvisited"] = True
-                    return False
-            pair_atoms.append([node_ref, node_tar])
-            return True
-
-        for _pair in candidate_pair:
-            pair_atoms_list = []
-            a.cache["unvisited"] = False
-            a.cache["ref_unvisited"] = False
-            if recursive_dfs(_pair["ref_root"], _pair["tar_root"], pair_atoms_list):
-                _pair["pair_list"] = pair_atoms_list
-            _reset_visited_flags(c)
-
-        # logger.debug('checked candidates of atom mapping on {}'.format(_a))
-
-        pairs_list = [_pair for _pair in candidate_pair if "pair_list" in _pair]
-        for _ps in pairs_list:
-            logger.debug(
-                "{}: {}: root {} and {}: map {}".format(
-                    c.name,
-                    a,
-                    _ps["ref_root"],
-                    _ps["tar_root"],
-                    [[str(k) for k in i] for i in _ps["pair_list"]],
-                )
-            )
-
-        # generate matrix
-        for _ps in pairs_list:
-            _mat = np.identity(len(c.atoms))
-            for ref_atom, tar_atom in _ps["pair_list"]:
-                _ref_idx = ref_atom.number - 1
-                _tar_idx = tar_atom.number - 1
-                _mat[[_ref_idx, _tar_idx]] = _mat[[_tar_idx, _ref_idx]]
-            _ps["pair_matrix"] = _mat
-
-        if len(pairs_list) != 0:
-            a.cache["isomeric_subs_list"] = [
-                {
-                    "root_a": _p["ref_root"],
-                    "root_b": _p["tar_root"],
-                    "list": _p["pair_list"],
-                    "matrix": _p["pair_matrix"],
-                }
-                for _p in pairs_list
-            ]
-
-    rotamer_mat_list = []
-    numisomer_mat_list = []
-    for a in c.atoms:
-        if "isomeric_subs_list" not in a.cache:
-            continue
-        # extract rotamers
-        if [len(a.bonds), len(a.cache["isomeric_subs_list"])] in [[2, 1], [3, 1]]:
-            # aromatic handling should be included
-            if len(a.double) != 0:
-                for double_bond_atom in a.double:
-                    if double_bond_atom in [
-                        a.cache["isomeric_subs_list"][0]["root_a"],
-                        a.cache["isomeric_subs_list"][0]["root_a"],
-                    ]:
-                        break
-                else:
-                    numisomer_mat_list.append(a.cache["isomeric_subs_list"][0]["matrix"])
-                    continue
-            rot_mat = a.cache["isomeric_subs_list"][0]["matrix"]
-            rot_mat = rot_mat.astype(int)
-            rotamer_mat_list.append(rot_mat)
-        elif [len(a.bonds), len(a.cache["isomeric_subs_list"])] in [[4, 3], [4, 6]]:
-            for _ps in a.cache["isomeric_subs_list"][1:]:
-                rot_mat = np.dot(_ps["matrix"], a.cache["isomeric_subs_list"][0]["matrix"])
-                rot_mat = rot_mat.astype(int)
-                rotamer_mat_list.append(rot_mat)
-            for _ps in a.cache["isomeric_subs_list"]:
-                numisomer_mat_list.append(_ps["matrix"])
-        else:
-            for _ps in a.cache["isomeric_subs_list"]:
-                numisomer_mat_list.append(_ps["matrix"])
-
-    # generate identical collections of rot_mat
-    rotamer_mat_list = {_m.tobytes(): _m for _m in rotamer_mat_list}.values()
-    numisomer_mat_list = {_m.tobytes(): _m for _m in numisomer_mat_list}.values()
-
-    # check chirality here
-    def _invalid_chirality(original_conf: System, modified_xyz: np.ndarray) -> int:
-        invalid_count = 0
-        original_xyz = np.array([a.xyz for a in original_conf.atoms])
-        for _a in original_conf.atoms:
-            if len(_a.bonds) != 4:
-                continue
-            _b_indexs = sorted(a.number - 1 for a in _a.bonds)
-            original_matirix = original_xyz[_b_indexs[1:]] - original_xyz[_b_indexs[0]]
-            modified_matirix = modified_xyz[_b_indexs[1:]] - modified_xyz[_b_indexs[0]]
-            if (np.linalg.det(original_matirix) > 0) != (np.linalg.det(modified_matirix) > 0):
-                invalid_count += 1
-        return invalid_count
-
-    # for TMS, cyclic_chiral_check has error
-    def _cyclic_chiral_check(c: System, rotamer_mat_list, numisomer_mat_list):
-        unchanged_flag = True
-        for rot_mat in rotamer_mat_list:
-            original_xyz = np.array([at.xyz for at in c.atoms])
-            number_of_invalid = _invalid_chirality(c, np.dot(rot_mat, original_xyz))
-            if number_of_invalid == 0:
-                continue
-            for num_mat in numisomer_mat_list:
-                t_mat = np.dot(num_mat, rot_mat)
-                if _invalid_chirality(c, np.dot(t_mat, original_xyz)) < number_of_invalid:
-                    rot_mat = t_mat
-                    unchanged_flag = False
-                    logger.debug(f"chirality in rotamer matrix was partially corrected: {rot_mat}")
-                    break
-            else:
-                logger.debug(f"chirality in rotamer matrix temporarily corrected: {rot_mat}")
-        return unchanged_flag
-
-    if len(rotamer_mat_list) != 0:
-        for _ in range(len(rotamer_mat_list)):
-            if _cyclic_chiral_check(c, rotamer_mat_list, numisomer_mat_list):
-                logger.debug(f"{c.name}: chirality in rotamer matrix was successfully corrected")
-                break
-        else:
-            logger.error(f"{c.name}: chirality in rotamer matrix was not completely corrected")
-
-    # generate identical collections of rot_mat again
-    rotamer_mat_list = {_m.tobytes(): _m for _m in rotamer_mat_list}.values()
-    numisomer_mat_list = {_m.tobytes(): _m for _m in numisomer_mat_list}.values()
-
-    # added matrix property
-    c.data["rotamer"] = [Matrix(c.atoms.to_list()).bind(_m) for _m in rotamer_mat_list]
-    c.data["numisomer"] = [Matrix(c.atoms.to_list()).bind(_m) for _m in numisomer_mat_list]
-
-    _del_visited_flags(c)
 
 
 def rmsdpruning(
@@ -455,10 +117,10 @@ def rmsdpruning(
             _for_all = True
 
         for i in range(len(_Systemcfs)):
-            if _Systemcfs[i].flag:
+            if _Systemcfs[i].state:
                 redundant_counter = 0
                 for q in range(i + 1, len(_Systemcfs)):
-                    if _Systemcfs[q].flag:
+                    if _Systemcfs[q].state:
                         _rms = cal_sym_rmsd(
                             _Systemcfs[i],
                             _Systemcfs[q],
@@ -669,7 +331,20 @@ def map_numbers(confs: Systems, reference_confs: Systems):
                 logger.error(f"{_c.name}: reached max iteration")
 
 
-def order_by_cip(substitutions: list[Atom], roots: list[Atom]):
-    for sub in substitutions:
-        pass
-    return []
+def set_chirality(c: System, center_index: int, sub_index: list[int]):
+    if len(sub_index) != 4:
+        raise ValueError
+    else:
+        sorted_index = sorted(sub_index)
+
+    _sub_xyzs = np.array([c.atoms.get(i).xyz for i in sorted_index[1:]]) - np.array(
+        [c.atoms.get(sorted_index[0]).xyz for _ in range(3)]
+    )
+    _ret = np.linalg.det(_sub_xyzs)
+    if _ret > 0:
+        _ret = 1
+    elif _ret < 0:
+        _ret = -1
+    else:
+        _ret = 0
+    c.data[f"chiral_{center_index}_to_{sub_index}"] = _ret
