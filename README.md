@@ -14,9 +14,9 @@ from accel import Box
 Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input("template_file.inp")
 ```
 ## How to use ACCeL
-### Figure of "Box"
+### figure of "Box"
 ![Box](./images/box_figure.png)
 
-### Methods of "Box"
-#### add(contents)
+### methods of "Box"
+#### `add(contents)`
 Adds files to the Box. Contents can be specified flexibly as directory name, filename, wildcard, iterative object, etc.
