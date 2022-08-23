@@ -18,6 +18,5 @@ Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input(
 ![Box](./images/box_figure.png)
 
 ### Methods of "Box"
-
 #### add(contents)
 Adds files to the Box. Contents can be specified flexibly as directory name, filename, wildcard, iterative object, etc.
