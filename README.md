@@ -19,6 +19,6 @@ Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input(
 
 ### methods of Box
 #### `add(contents)`
-Adds files to the Box. Contents can be specified flexibly as directory name, filename, wildcard, iterative object, etc.
+> Adds files to the Box. Contents can be specified flexibly as directory name, filename, wildcard, iterative object, etc.
 #### `read_atoms(filetype=None, **options)`
-Read coordinate information and other information from files.
+> Read coordinate information and other information from files.
