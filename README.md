@@ -13,10 +13,11 @@ pip install accel
 from accel import Box
 Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input("template_file.inp")
 ```
-## Figure of "Box"
+## How to use ACCeL
+### Figure of "Box"
 ![Box](./images/box_figure.png)
 
-## Methods of "Box"
+### Methods of "Box"
 
-### add(contents)
+#### add(contents)
 Adds files to the Box. Contents can be specified flexibly as directory name, filename, wildcard, iterative object, etc.
