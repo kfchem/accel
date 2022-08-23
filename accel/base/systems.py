@@ -132,10 +132,13 @@ class System:
     def show(self):
         data_dict = {}
         data_dict["name"] = self.name
-        try:
-            _path = self.path.relative_to(Path.cwd())
-        except ValueError:
-            _path = self.path.absolute()
+        if self.path is not None:
+            try:
+                _path = self.path.relative_to(Path.cwd())
+            except ValueError:
+                _path = self.path.absolute()
+        else:
+            _path = "---"
         data_dict["path"] = _path
         data_dict["fileType"] = self.filetype
         if self.state:
@@ -188,7 +191,7 @@ class Systems(MutableSequence):
             for c in contents:
                 if isinstance(c, System):
                     self._list.append(c)
-                elif isinstance(c, Path) or isinstance(c, str) :
+                elif isinstance(c, Path) or isinstance(c, str):
                     self._list.append(System(c))
                 else:
                     logger.error("Systems accepts only Iterable[System-like]")
@@ -235,10 +238,13 @@ class Systems(MutableSequence):
                 _energy = "----- kcal/mol"
             else:
                 _energy = f"{c.energy:>5.1f} kcal/mol"
-            try:
-                _path = c.path.relative_to(Path.cwd())
-            except ValueError:
-                _path = c.path.absolute()
+            if c.path is not None:
+                try:
+                    _path = c.path.relative_to(Path.cwd())
+                except ValueError:
+                    _path = c.path.absolute()
+            else:
+                _path = "---"
             logger.info(f"{idx:>4}: {c.name:<18}: {_is_active:<7}: {c.label:<12}: {_energy}: {str(_path)}")
 
     def insert(self, index: int, value: Union[System, Path, str]):

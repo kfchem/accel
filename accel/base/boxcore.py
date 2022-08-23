@@ -45,16 +45,32 @@ class BoxCore:
             if contents is not None:
                 _add(contents, self)
 
-    def get(self, arg: Union[bool, str] = None) -> Systems:
-        if arg is None:
-            return self.contents.has_state(True)
-        elif isinstance(arg, bool):
+    def get(self, arg: Union[bool, str] = True) -> Systems:
+        if isinstance(arg, bool) or arg is None:
             return self.contents.has_state(arg)
         elif isinstance(arg, str):
             return self.contents.has_label(arg)
         else:
             logger.error(f"invalid arg: {arg}")
             raise ValueError
+
+    # for backward compatibility
+    @property
+    def _mols(self) -> Systems:
+        logger.error("_mols is deprecated: use contents")
+        return self.contents
+
+    # for backward compatibility
+    @property
+    def mols(self) -> Systems:
+        logger.error("mols is deprecated: use get()")
+        return self.contents.has_state(True)
+
+    # for backward compatibility
+    @property
+    def allmols(self) -> Systems:
+        logger.error("allmols is deprecated: use get(None)")
+        return self.contents.has_state(None)
 
     def __len__(self) -> int:
         return len(self.contents)
