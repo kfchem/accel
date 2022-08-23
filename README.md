@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./logo.svg" alt="ACCeL" width="150px">
+  <img src="./images/logo.svg" alt="ACCeL" width="150px">
 </p>
 
 #
@@ -8,3 +8,10 @@ ACCeL is a python package that enables batch processing of conformational isomer
 ```
 pip install accel
 ```
+## Examples
+```
+from accel import Box
+Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input("temp.inp")
+```
+## Figure of "Box"
+![Box](./images/box_figure.png)
