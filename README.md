@@ -13,7 +13,7 @@ pip install accel
 from accel import Box
 Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input("template_file.inp")
 ```
-## How to use ACCeL
+## How to use "Box"
 ![Box](./images/box_figure.png)
 
 #### `add(contents)`
