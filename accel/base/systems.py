@@ -352,11 +352,11 @@ class Systems(MutableSequence):
         if value is None:
             c_list = [_c for _c in self._list if key in _c.data.keys()]
         else:
-            c_list = [_c for _c in self._list if _c.data.get(key) is value]
+            c_list = [_c for _c in self._list if _c.data.get(key) == value]
         return Systems().bind(c_list)
 
     def has_filetype(self, filetype: str) -> "Systems":
-        return Systems().bind([_c for _c in self._list if _c.filetype is filetype])
+        return Systems().bind([_c for _c in self._list if _c.filetype == filetype])
 
     def get(self, identifier=None) -> System:
         if len(self._list) == 0:
