@@ -146,8 +146,8 @@ class Atom:
 
     def move(self, vector=(0.0, 0.0, 0.0)):
         self.x = self.x + float(vector[0])
-        self.y = self.y + float(vector[0])
-        self.z = self.z + float(vector[0])
+        self.y = self.y + float(vector[1])
+        self.z = self.z + float(vector[2])
         return self
 
     def duplicate(self, atoms=None) -> "Atom":
