@@ -199,6 +199,32 @@ class Modeler:
                         self.atoms.bonds[index_a + 1, index_b + 1] = _tyep
         return self
 
+    def merge(self, atoms: Atoms):
+        p_len = len(self.atoms)
+        for a in atoms:
+            self.atoms.append(a)
+        for b_ft, b_val in atoms.bonds.to_dict().items():
+            self.atoms.bonds[b_ft[0] + p_len, b_ft[1] + p_len] = b_val
+        logger.debug(f"merged {len(atoms)} atoms")
+        return self
+
+    def incorporate(self, atoms: Atoms, padding: float = 2.0):
+        padding = float(padding)
+        t_atoms = atoms.duplicate()
+        s_xyzs = [a.xyz for a in self.atoms]
+        max_xyz = [max([xyz[i] for xyz in s_xyzs]) for i in range(3)]
+        t_xyzs = [a.xyz for a in t_atoms]
+        min_xyz = [min([xyz[i] for xyz in t_xyzs]) for i in range(3)]
+        vec = [max_xyz[i] - min_xyz[i] + padding for i in range(3)]
+        logger.debug(f"incoporate vector: {vec}")
+        for a in t_atoms:
+            a.move(vec)
+        self.merge(t_atoms)
+        return self
+
+    def _map_to(self, target: Atoms):
+        return self
+
     def get_splitted(self) -> list["Atoms"]:
         atom_ll: list[list[int]] = [[_a.number] for _a in self.atoms]
         bonding_types = [
