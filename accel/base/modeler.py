@@ -268,11 +268,8 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = False,
-        cec_threshold: float = 0.3,
     ) -> list[list[int]]:
-        atoms_map = _get_maps(
-            target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first, cec_threshold=cec_threshold
-        )
+        atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self.atoms, atoms_map)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
@@ -295,11 +292,8 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = False,
-        cec_threshold: float = 0.3,
     ) -> list["Atoms"]:
-        atoms_map = _get_maps(
-            target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first, cec_threshold=cec_threshold
-        )
+        atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _order_maps(target, self.atoms, atoms_map)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
@@ -561,7 +555,6 @@ def _get_maps(
     known_pairs: list[tuple[int]] = [],
     exclude_known: bool = False,
     terminal_first: bool = False,
-    cec_threshold: float = 0.3,
 ) -> list[list[tuple[Atom]]]:
 
     if len(known_pairs) == 0:
@@ -874,16 +867,14 @@ def _get_maps(
     for chain in canonical_extended_chains.values():
         logger.debug(f"canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
-    max_len_of_cec = max([len(chain) for chain in canonical_extended_chains])
-    min_len_of_cec = min([len(chain) for chain in canonical_extended_chains])
+    max_h_len = max(
+        [len([None for pr in chain if pr[0].symbol != "H"]) for chain in canonical_extended_chains.values()]
+    )
 
-    if (max_len_of_cec - min_len_of_cec) / max_len_of_cec > cec_threshold:
-        length_check = True
-    else:
-        length_check = False
     recursive_extended_chains: list[list[tuple[Atom]]] = []
     for chain in canonical_extended_chains.values():
-        if length_check and len(chain) < max_len_of_cec:
+        if max_h_len > len([None for pr in chain if pr[0].symbol != "H"]):
+            logger.debug(f"excluded canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
             continue
         if len(chain) < min(len(atoms_a), len(atoms_b)):
             new_maps = _get_maps(
@@ -892,7 +883,6 @@ def _get_maps(
                 known_pairs=chain,
                 exclude_known=True,
                 terminal_first=False,
-                cec_threshold=cec_threshold,
             )
             if len(new_maps) == 0:
                 recursive_extended_chains.append(chain)
@@ -916,7 +906,122 @@ def _get_maps(
 
 
 def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]]) -> list[list[tuple[Atom]]]:
-    return atom_maps
+    def aconv(atom: Atom, a_map: list[tuple[Atom]]) -> Atom:
+        try:
+            idx = [pr[0] for pr in a_map].index(atom)
+        except ValueError:
+            pass
+        else:
+            return a_map[idx][1]
+        try:
+            idx = [pr[1] for pr in a_map].index(atom)
+        except ValueError:
+            pass
+        else:
+            return a_map[idx][0]
+        return None
+
+    evaluated_dicts = [{"map": mp} for mp in atom_maps]
+    for evaluated_dic in evaluated_dicts:
+        atom_map: list[tuple[Atom]] = evaluated_dic["map"]
+        bonding_pairs: list[tuple[Atom]] = []
+        normal_pairs: list[tuple[Atom]] = []
+        for pair in atom_map:
+            a_bonding_nums = sorted([a.number for a in pair[0].bonds])
+            b_bonding_nums = sorted(
+                [aconv(b, atom_map).number for b in pair[1].bonds if aconv(b, atom_map) is not None]
+            )
+            if a_bonding_nums == b_bonding_nums:
+                a_to_b = True
+            else:
+                a_to_b = False
+            b_bonding_nums = sorted([b.number for b in pair[1].bonds])
+            a_bonding_nums = sorted(
+                [aconv(a, atom_map).number for a in pair[0].bonds if aconv(a, atom_map) is not None]
+            )
+            if a_bonding_nums == b_bonding_nums:
+                b_to_a = True
+            else:
+                b_to_a = False
+
+            if a_to_b and b_to_a:
+                normal_pairs.append(pair)
+            else:
+                bonding_pairs.append(pair)
+
+        evaluated_dic["bonding_local_rmsd"] = 0
+        for pr in bonding_pairs:
+            local_pairs: list[tuple[Atom]] = [pr]
+            _b_bonds = pr[1].bonds
+            for a_bonding in pr[0].bonds:
+                _aconv = aconv(a_bonding, atom_map)
+                if _aconv is not None and _aconv in _b_bonds:
+                    local_pairs.append((a_bonding, _aconv))
+            a_xyzs = np.array([tpr[0].xyz for tpr in local_pairs])
+            b_xyzs = np.array([tpr[1].xyz for tpr in local_pairs])
+            a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
+            b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
+            evaluated_dic["bonding_local_rmsd"] += _kabsch(a_xyzs, b_xyzs)
+
+        evaluated_dic["local_rmsd"] = 0.0
+        for pr in normal_pairs:
+            local_pairs: list[tuple[Atom]] = [pr]
+            _b_bonds = pr[1].bonds
+            for a_bonding in pr[0].bonds:
+                _aconv = aconv(a_bonding, atom_map)
+                if not (_aconv is not None and _aconv in _b_bonds):
+                    continue
+                local_pairs.append((a_bonding, _aconv))
+                for a_gem in a_bonding.bonds:
+                    _b_gem_bonds = _aconv.bonds
+                    _a_gem_conv = aconv(a_gem, atom_map)
+                    if _a_gem_conv is not None and _a_gem_conv in _b_gem_bonds:
+                        local_pairs.append((a_gem, _a_gem_conv))
+            a_xyzs = np.array([tpr[0].xyz for tpr in local_pairs])
+            b_xyzs = np.array([tpr[1].xyz for tpr in local_pairs])
+            a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
+            b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
+            evaluated_dic["local_rmsd"] += _kabsch(a_xyzs, b_xyzs)
+
+        evaluated_dic["num_of_long_rearranged_atoms"] = 0
+        for pr in bonding_pairs:
+            for a_bonding in pr[0].bonds:
+                if a_bonding in [pr[0] for pr in bonding_pairs]:
+                    if aconv(a_bonding, atom_map) is None:
+                        continue
+                    if aconv(a_bonding, atom_map) in pr[1].bonds:
+                        continue
+                    for b_bonding in aconv(a_bonding, atom_map).bonds:
+                        if aconv(b_bonding, atom_map) in a_bonding.bonds:
+                            continue
+                        if b_bonding in [pr[1] for pr in bonding_pairs]:
+                            evaluated_dic["num_of_long_rearranged_atoms"] += 1
+            for b_bonding in pr[1].bonds:
+                if b_bonding in [pr[1] for pr in bonding_pairs]:
+                    if aconv(b_bonding, atom_map) is None:
+                        continue
+                    if aconv(b_bonding, atom_map) in pr[0].bonds:
+                        continue
+                    for a_bonding in aconv(b_bonding, atom_map).bonds:
+                        if aconv(a_bonding, atom_map) in b_bonding.bonds:
+                            continue
+                        if a_bonding in [pr[0] for pr in bonding_pairs]:
+                            evaluated_dic["num_of_long_rearranged_atoms"] += 1
+        evaluated_dic["num_of_long_rearranged_atoms"] /= 2
+
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["local_rmsd"])
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: round(d["bonding_local_rmsd"] * 0.5, 3))
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["num_of_long_rearranged_atoms"])
+    return_list = []
+    for evaluated_dic in evaluated_dicts:
+        mp = [(pr[0].number, pr[1].number) for pr in evaluated_dic["map"]]
+        return_list.append(evaluated_dic["map"])
+        logger.info(f"mapping: {mp}")
+        logger.info(f"num_of_long_rearranged_atoms: {evaluated_dic['num_of_long_rearranged_atoms']}")
+        logger.info(f"bonding_local_rmsd: {evaluated_dic['bonding_local_rmsd']}")
+        logger.info(f"local_rmsd: {evaluated_dic['local_rmsd']}")
+
+    return return_list
 
 
 def _kabsch(ref_xyzs: np.ndarray, tar_xyzs: np.ndarray) -> float:
