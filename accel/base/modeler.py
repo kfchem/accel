@@ -268,8 +268,11 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = False,
+        cec_threshold: float = 0.3,
     ) -> list[list[int]]:
-        atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
+        atoms_map = _get_maps(
+            target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first, cec_threshold=cec_threshold
+        )
         atoms_map = _order_maps(target, self.atoms, atoms_map)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
@@ -292,8 +295,11 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = False,
+        cec_threshold: float = 0.3,
     ) -> list["Atoms"]:
-        atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
+        atoms_map = _get_maps(
+            target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first, cec_threshold=cec_threshold
+        )
         atoms_map = _order_maps(target, self.atoms, atoms_map)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
@@ -555,6 +561,7 @@ def _get_maps(
     known_pairs: list[tuple[int]] = [],
     exclude_known: bool = False,
     terminal_first: bool = False,
+    cec_threshold: float = 0.3,
 ) -> list[list[tuple[Atom]]]:
 
     if len(known_pairs) == 0:
@@ -669,12 +676,11 @@ def _get_maps(
     def _isproper_bonding(atom_a: Atom, atom_b: Atom, side_pairs: list[tuple[Atom]]):
         atom_a_bonds = atom_a.bonds
         atom_b_bonds = atom_b.bonds
-        # shoud swap here
-        if len(atom_a_bonds) != len(atom_b_bonds):
-            return True
-        # and here
+        # I swaped these two if sentence, but I not sure it was needed.
         if len([a for a in atom_a_bonds if a.symbol == "H"]) != len([a for a in atom_b_bonds if a.symbol == "H"]):
             return False
+        if len(atom_a_bonds) != len(atom_b_bonds):
+            return True
         a_side_pairs = [_ab[0] for _ab in side_pairs]
         b_side_pairs = [_ab[1] for _ab in side_pairs]
         a_index_list = sorted([a_side_pairs.index(_a) for _a in atom_a_bonds if _a in a_side_pairs])
@@ -868,10 +874,26 @@ def _get_maps(
     for chain in canonical_extended_chains.values():
         logger.debug(f"canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
+    max_len_of_cec = max([len(chain) for chain in canonical_extended_chains])
+    min_len_of_cec = min([len(chain) for chain in canonical_extended_chains])
+
+    if (max_len_of_cec - min_len_of_cec) / max_len_of_cec > cec_threshold:
+        length_check = True
+    else:
+        length_check = False
     recursive_extended_chains: list[list[tuple[Atom]]] = []
     for chain in canonical_extended_chains.values():
+        if length_check and len(chain) < max_len_of_cec:
+            continue
         if len(chain) < min(len(atoms_a), len(atoms_b)):
-            new_maps = _get_maps(atoms_a, atoms_b, known_pairs=chain, exclude_known=True, terminal_first=False)
+            new_maps = _get_maps(
+                atoms_a,
+                atoms_b,
+                known_pairs=chain,
+                exclude_known=True,
+                terminal_first=False,
+                cec_threshold=cec_threshold,
+            )
             if len(new_maps) == 0:
                 recursive_extended_chains.append(chain)
             else:
