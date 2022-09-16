@@ -1,4 +1,4 @@
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 from accel.base.atoms import Atom, Atoms
 from accel.base.box import Box
