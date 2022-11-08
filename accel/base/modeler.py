@@ -512,10 +512,10 @@ class Modeler:
                     if _invalid_chirality(atoms, np.dot(t_mat, original_xyz)) < number_of_invalid:
                         rotamer_mat_list[rm_idx] = t_mat
                         unchanged_flag = False
-                        logger.debug(f"chirality in rotamer matrix was partially corrected: {rot_mat}")
+                        logger.debug("chirality in rotamer matrix was partially corrected")
                         break
                 else:
-                    logger.debug(f"chirality in rotamer matrix temporarily corrected: {rot_mat}")
+                    logger.debug("chirality in rotamer matrix temporarily corrected")
             return unchanged_flag
 
         if len(rotamer_mat_list) != 0:
