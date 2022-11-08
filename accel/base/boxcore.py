@@ -373,7 +373,7 @@ class BoxCore:
         logger.debug(f"done: {str(self)}")
         return self
 
-    def calc_symm(self, calc_all: bool = False):
+    def calc_symm(self, calc_all: bool = True):
         if not calc_all:
             cfs = []
             if len(self.get()) != len(self.get().has_label()):
@@ -420,7 +420,7 @@ class BoxCore:
     ):
         if len(self.get()) != len(self.get().has_data("has_symm", True)):
             logger.info("calc_symm called automatically")
-            self.calc_symm()
+            self.calc_symm(calc_all=False)
         topology.rmsdpruning(
             self.get(),
             threshold,

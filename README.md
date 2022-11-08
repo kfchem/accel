@@ -81,7 +81,7 @@ Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input(
 > #DATA[]# -> data value
 #### `calc_bonds(cov_scaling=1.1, vdw_scaling=1.0)`
 > Embed bonding information. Necessary to calculate the symmetric information.
-#### `calc_symm(calc_all=False)`
+#### `calc_symm(calc_all=True)`
 > Embed symmetry information; required for RMSD calculations.
 #### `rmsd_limit(threshold=0.01, all_combinations_of_confs=False, redundant_check=3, all_perturbation_of_rotamers=False)`
 > Disable one conformation among the conformations whose RMSD is less than a certain value. In other words, it removes the identical conformations. The default value is 0.01 angstrom.

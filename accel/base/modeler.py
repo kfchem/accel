@@ -4,6 +4,7 @@ from statistics import mean
 from typing import Iterable, Sequence
 
 import numpy as np
+
 from accel.base.atoms import Atom, Atoms, BondType
 from accel.base.tools import float_to_str
 from accel.util.constants import Elements
@@ -481,8 +482,8 @@ class Modeler:
                     numisomer_mat_list.append(_ps["matrix"])
 
         # generate identical collections of rot_mat
-        rotamer_mat_list = {_m.tobytes(): _m for _m in rotamer_mat_list}.values()
-        numisomer_mat_list = {_m.tobytes(): _m for _m in numisomer_mat_list}.values()
+        rotamer_mat_list = list({_m.tobytes(): _m for _m in rotamer_mat_list}.values())
+        numisomer_mat_list = list({_m.tobytes(): _m for _m in numisomer_mat_list}.values())
 
         # check chirality here
         def _invalid_chirality(atoms: Atoms, modified_xyz: np.ndarray) -> int:
@@ -501,7 +502,7 @@ class Modeler:
         # for TMS, cyclic_chiral_check has error
         def _cyclic_chiral_check(atoms: Atoms, rotamer_mat_list, numisomer_mat_list):
             unchanged_flag = True
-            for rot_mat in rotamer_mat_list:
+            for rm_idx, rot_mat in enumerate(rotamer_mat_list):
                 original_xyz = np.array([at.xyz for at in atoms])
                 number_of_invalid = _invalid_chirality(atoms, np.dot(rot_mat, original_xyz))
                 if number_of_invalid == 0:
@@ -509,7 +510,7 @@ class Modeler:
                 for num_mat in numisomer_mat_list:
                     t_mat = np.dot(num_mat, rot_mat)
                     if _invalid_chirality(atoms, np.dot(t_mat, original_xyz)) < number_of_invalid:
-                        rot_mat = t_mat
+                        rotamer_mat_list[rm_idx] = t_mat
                         unchanged_flag = False
                         logger.debug(f"chirality in rotamer matrix was partially corrected: {rot_mat}")
                         break
