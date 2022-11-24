@@ -4,6 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+
 from accel.base.boxcore import BoxCore
 from accel.base.selector import Selectors
 from accel.base.systems import System, Systems
@@ -665,3 +666,102 @@ class GauBox(BoxCore):
             submit(c)
         logger.debug(f"done: {str(self)}")
         return self
+
+    def get_irc(self) -> Systems:
+        ret_cs = []
+        for c in self.get():
+            logger.debug(f"reading irc of {c.path.name}")
+            with c.path.open() as f:
+                ls = f.readlines()
+            rxn_direction = "NAN"
+            ts_appended = False
+            t_charge = c.total_charge
+            for i, line in enumerate(ls):
+                if "Rxn path following direction =" in line:
+                    rxn_direction = line.split()[5]
+                if "Charge =" in line:
+                    t_charge = int(line.split()[2])
+                if "Cartesian Coordinates (Ang):" in line or "Input orientation:" in line:
+                    geom = []
+                    for _l in ls[(i + 5) :]:
+                        if _l.find("---------------------------------------------------------------------") > -1:
+                            break
+                        axyz = []
+                        axyz.append(int(_l.split()[1]))
+                        axyz.append(float(_l.split()[-3]))
+                        axyz.append(float(_l.split()[-2]))
+                        axyz.append(float(_l.split()[-1]))
+                        geom.append(axyz)
+                if "NET REACTION COORDINATE UP TO THIS POINT =" in line:
+                    rxn_coord = float(line.split()[8])
+                    if rxn_direction == "Reverse":
+                        rxn_coord = (-1) * rxn_coord
+                if "Corrected End Point Energy =" in line:
+                    scf_energy = float(line.split()[5])
+                if "# OF POINTS ALONG THE PATH" in line:
+                    num_of_points = int(line.split()[7])
+                    new_c = c.duplicate()
+                    new_c.label = new_c.name
+                    new_c.name = f"{new_c.name}_{rxn_direction[0]}{num_of_points:02}"
+                    new_c.energy = Units.hartree(scf_energy).to_kcal_mol
+                    new_c.data["g16_irc_scf"] = scf_energy
+                    new_c.data["rxn_coordinate"] = rxn_coord
+                    new_c.total_charge = t_charge
+                    new_c.atoms.clear()
+                    new_c.atoms.extend(geom)
+                    ret_cs.append(new_c)
+                if "Current Structure is TS" in line and not ts_appended:
+                    new_c = c.duplicate()
+                    new_c.label = new_c.name
+                    new_c.name = f"{new_c.name}__TS"
+                    bf_ls = ls[:i]
+                    while bf_ls:
+                        _l = bf_ls.pop()
+                        if "SCF Done:" in _l:
+                            new_c.data["g16_irc_scf"] = float(_l.split()[4])
+                            new_c.energy = Units.hartree(new_c.data["g16_irc_scf"]).to_kcal_mol
+                            break
+                    new_c.data["rxn_coordinate"] = 0
+                    new_c.total_charge = t_charge
+                    new_c.atoms.clear()
+                    new_c.atoms.extend(geom)
+                    ret_cs.append(new_c)
+                    ts_appended = True
+        logger.debug(f"done: {str(self)}")
+        return Systems(ret_cs)
+
+    def get_trj(self) -> Systems:
+        ret_cs = []
+        for c in self.get():
+            logger.debug(f"reading trajectory of {c.path.name}")
+            with c.path.open() as f:
+                ls = f.readlines()
+            t_charge = c.total_charge
+            for i, line in enumerate(ls):
+                if "Charge =" in line:
+                    t_charge = int(line.split()[2])
+                if "Input orientation:" in line:
+                    geom = []
+                    for _l in ls[(i + 5) :]:
+                        if _l.find("---------------------------------------------------------------------") > -1:
+                            break
+                        axyz = []
+                        axyz.append(int(_l.split()[1]))
+                        axyz.append(float(_l.split()[-3]))
+                        axyz.append(float(_l.split()[-2]))
+                        axyz.append(float(_l.split()[-1]))
+                        geom.append(axyz)
+                if "SCF Done:" in line:
+                    scf_energy = float(line.split()[4])
+                    new_c = c.duplicate()
+                    new_c.label = new_c.name
+                    new_c.name = f"{new_c.name}_{len(ret_cs)+1:03}"
+                    new_c.energy = Units.hartree(scf_energy).to_kcal_mol
+                    new_c.data["g16_scf"] = scf_energy
+                    new_c.data["trj_num"] = len(ret_cs) + 1
+                    new_c.total_charge = t_charge
+                    new_c.atoms.clear()
+                    new_c.atoms.extend(geom)
+                    ret_cs.append(new_c)
+        logger.debug(f"done: {str(self)}")
+        return Systems(ret_cs)
