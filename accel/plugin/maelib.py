@@ -219,7 +219,7 @@ class MaeBox(BoxCore):
                     if "f_m_ct" in line:
                         f_m_ct_idx += 1
                         if f_m_ct_idx > max_loading:
-                            logger.info("reached max_loading")
+                            logger.info(f"reached max_loading: {max_loading}")
                             break
                     ls.append(line)
             try:
@@ -232,9 +232,6 @@ class MaeBox(BoxCore):
             else:
                 max_zero = zero_fill_digit
             for num, f_m_ct in enumerate(f_m_ct_list):
-                if num >= max_loading:
-                    logger.error(f"max loading count {max_loading} reached")
-                    break
                 new_c = System(file_path=maegz.path)
                 new_c.name = "{c}_{num:0={zero}}".format(c=f_m_ct["s_m_title"], num=num + 1, zero=max_zero)
                 _embed_f_m_ct(new_c, f_m_ct)
