@@ -213,7 +213,15 @@ class MaeBox(BoxCore):
         for maegz in self.get():
             logger.info(f"reading {maegz.name}")
             with gzip.open(maegz.path, mode="rt") as f:
-                ls = f.readlines()
+                ls = []
+                f_m_ct_idx = 0
+                for line in f:
+                    if "f_m_ct" in line:
+                        f_m_ct_idx += 1
+                        if f_m_ct_idx > max_loading:
+                            logger.info("reached max_loading")
+                            break
+                    ls.append(line)
             try:
                 f_m_ct_list = _get_f_m_ct_list(ls)
             except ValueError:
