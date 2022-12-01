@@ -702,7 +702,7 @@ class GauBox(BoxCore):
                     num_of_points = int(line.split()[7])
                     new_c = c.duplicate()
                     new_c.label = new_c.name
-                    new_c.name = f"{new_c.name}_{rxn_direction[0]}{num_of_points:02}"
+                    new_c.name = f"{new_c.name}_{rxn_direction[0]}{num_of_points:03}"
                     new_c.energy = Units.hartree(scf_energy).to_kcal_mol
                     new_c.data["g16_irc_scf"] = scf_energy
                     new_c.data["rxn_coordinate"] = rxn_coord
@@ -713,7 +713,7 @@ class GauBox(BoxCore):
                 if "Current Structure is TS" in line and not ts_appended:
                     new_c = c.duplicate()
                     new_c.label = new_c.name
-                    new_c.name = f"{new_c.name}__TS"
+                    new_c.name = f"{new_c.name}_TS"
                     bf_ls = ls[:i]
                     while bf_ls:
                         _l = bf_ls.pop()
