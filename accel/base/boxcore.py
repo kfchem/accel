@@ -559,7 +559,7 @@ class BoxCore:
     ):
         for c in self.get():
             logger.info(
-                f"{c.name}: moving {c.atoms.get(number_a)} and {c.atoms.get(number_a)} to make their distance {target}"
+                f"{c.name}: moving {c.atoms.get(number_a)} and {c.atoms.get(number_b)} to make their distance {target}"
             )
             c.modeler.set_length(
                 number_a, number_b, target, (bool(fix_a), bool(fix_b)), numbers_along_with_a, numbers_along_with_b
