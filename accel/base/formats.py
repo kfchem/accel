@@ -268,8 +268,12 @@ def replace_key(c: System, lines: list[str]):
             rls = rls.replace("#LABEL#", str(c.label))
             continue
         break
-    rls = [_l + "\n" for _l in rls.split("\n")]
-    return rls[:-1]
+    if rls[-1] == "\n":
+        rls = [_l + "\n" for _l in rls.split("\n")][:-1]
+    else:
+        rls = [_l + "\n" for _l in rls.split("\n")]
+        rls[-1] = rls[-1][:-1]
+    return rls
 
 
 def replace_arg(c: System, lines: list[str], arg: dict[str, str]):
