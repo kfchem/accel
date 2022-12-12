@@ -680,6 +680,15 @@ def _get_maps(
         a_index_list = sorted([a_side_pairs.index(_a) for _a in atom_a_bonds if _a in a_side_pairs])
         b_index_list = sorted([b_side_pairs.index(_a) for _a in atom_b_bonds if _a in b_side_pairs])
         if a_index_list != b_index_list:
+            # trap 1,2-migration to return True
+            a_diff_idx = list(set(a_index_list) - set(b_index_list))
+            b_diff_idx = list(set(b_index_list) - set(a_index_list))
+            if len(a_diff_idx) == 1 and len(b_diff_idx) == 1:
+                if (
+                    a_side_pairs[a_diff_idx[0]] in a_side_pairs[b_diff_idx[0]].bonds
+                    and b_side_pairs[b_diff_idx[0]] in b_side_pairs[a_diff_idx[0]].bonds
+                ):
+                    return True
             return False
         return True
 
@@ -760,6 +769,30 @@ def _get_maps(
             return True
         return False
 
+    def _get_most_dihedral(a_list: list[Atom], b: Atom, c: Atom, d: Atom) -> tuple[Atom, float]:
+        max_dihedral_a = a_list[0]
+        max_dihedral_angle = 0
+        vb = np.array(b.xyz)
+        vc = np.array(c.xyz)
+        vd = np.array(d.xyz)
+        vcb = vc - vb
+        vdc = vd - vc
+        for a in a_list:
+            va = np.array(a.xyz)
+            vab = va - vb
+            pvac: np.ndarray = np.cross(vab, vcb)
+            pvbd: np.ndarray = np.cross(vdc, vcb)
+            dac = np.linalg.norm(pvac)
+            dbd = np.linalg.norm(pvbd)
+            angle = np.arccos(np.sum(pvac * pvbd) / (dac * dbd))
+            if np.sum(pvac * np.cross(pvbd, vcb)) < 0:
+                angle = -angle
+            angle = np.absolute(np.rad2deg(angle))
+            if max_dihedral_angle <= angle:
+                max_dihedral_a = a
+                max_dihedral_angle = angle
+        return (max_dihedral_a, max_dihedral_angle)
+
     extended_chains: list[list[tuple[Atom]]] = []
     for chain in h_matched_chains:
         stack = deque([pr for pr in chain])
@@ -818,7 +851,47 @@ def _get_maps(
             if len(tri_subs) >= 1:
                 large_as = _get_large([_a for _a in next_as if _a.symbol == tri_subs[0]])
                 large_bs = _get_large([_b for _b in next_bs if _b.symbol == tri_subs[0]])
-                _new_assign((large_as[0], large_bs[0]), root_pair)
+                if len(large_as) == 1 and len(large_bs) == 1:
+                    _new_assign((large_as[0], large_bs[0]), root_pair)
+                    continue
+                not_large_as = [a for a in next_as if a not in large_as]
+                not_large_bs = [b for b in next_bs if b not in large_bs]
+                if len(not_large_as) == 1 and len(not_large_bs) == 1:
+                    _new_assign((not_large_as[0], not_large_bs[0]), root_pair)
+                    continue
+                known_a1_idxs = [assigned_as.index(a) for a in root_pair[0].bonds if a in assigned_as]
+                known_b1_idxs = [assigned_bs.index(b) for b in root_pair[1].bonds if b in assigned_bs]
+                known_1idxs = list(set(known_a1_idxs) & set(known_b1_idxs))
+                if len(known_1idxs) == 0:
+                    _new_assign((large_as[0], large_bs[0]), root_pair)
+                    continue
+                pre_large_a = large_as[0]
+                pre_large_b = large_bs[0]
+                max_dihedral = 0.0
+                for known_1idx in known_1idxs:
+                    known_a2_idxs = [
+                        assigned_as.index(a)
+                        for a in assigned_as[known_1idx].bonds
+                        if (a in assigned_as) and (a != root_pair[0])
+                    ]
+                    known_b2_idxs = [
+                        assigned_bs.index(b)
+                        for b in assigned_bs[known_1idx].bonds
+                        if (b in assigned_bs) and (b != root_pair[1])
+                    ]
+                    known_2idxs = list(set(known_a2_idxs) & set(known_b2_idxs))
+                    for known_2idx in known_2idxs:
+                        pre_a, dihedral_a = _get_most_dihedral(
+                            large_as, root_pair[0], assigned_as[known_1idx], assigned_as[known_2idx]
+                        )
+                        pre_b, dihedral_b = _get_most_dihedral(
+                            large_bs, root_pair[1], assigned_bs[known_1idx], assigned_bs[known_2idx]
+                        )
+                        if max(dihedral_a, dihedral_b) >= max_dihedral:
+                            max_dihedral = max(dihedral_a, dihedral_b)
+                            pre_large_a = pre_a
+                            pre_large_b = pre_b
+                _new_assign((pre_large_a, pre_large_b), root_pair)
                 continue
 
             di_subs = [_s for _s in a_sbls if min(a_sbls.count(_s), b_sbls.count(_s)) == 2]
@@ -829,6 +902,9 @@ def _get_maps(
                     _new_assign((large_as[0], large_bs[0]), root_pair)
                     continue
                 if len(large_as) == 1 or len(large_bs) == 1:
+                    continue
+                if len(root_pair[0].bonds) != len(root_pair[1].bonds):
+                    # I'm not sure if this block is needed.
                     continue
                 known_as = [_a for _a in root_pair[0].bonds if _a in assigned_as]
                 corre_bs = [assigned_bs[assigned_as.index(_a)] for _a in known_as]
