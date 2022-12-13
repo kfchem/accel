@@ -268,7 +268,9 @@ def replace_key(c: System, lines: list[str]):
             rls = rls.replace("#LABEL#", str(c.label))
             continue
         break
-    if rls[-1] == "\n":
+    if len(rls) == 0:
+        pass
+    elif rls[-1] == "\n":
         rls = [_l + "\n" for _l in rls.split("\n")][:-1]
     else:
         rls = [_l + "\n" for _l in rls.split("\n")]
