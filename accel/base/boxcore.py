@@ -531,6 +531,7 @@ class BoxCore:
                 logger.info(f"all of active conformers do not have {key} data")
                 continue
             for c in new_ls:
+                c.data[key] = 0.0
                 for _oc in self.get().labels.get(c.name):
                     c.data[key] += _oc.data[key] * _oc.distribution
         for key in keys_for_atoms:
