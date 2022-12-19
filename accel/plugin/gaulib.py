@@ -696,6 +696,8 @@ class GauBox(BoxCore):
                     rxn_coord = float(line.split()[8])
                     if rxn_direction == "Reverse":
                         rxn_coord = (-1) * rxn_coord
+                if "SCF Done:" in line:
+                    scf_energy = float(line.split()[4])
                 if "Corrected End Point Energy =" in line:
                     scf_energy = float(line.split()[5])
                 if "# OF POINTS ALONG THE PATH" in line:
