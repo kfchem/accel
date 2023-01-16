@@ -81,9 +81,9 @@ class System:
         elif key == "name":
             value = str(value)
             logger.debug(f"{self}: name: {value}")
-        elif key == "flag":
+        elif key == "state":
             value = bool(value)
-            logger.debug(f"{self}: flag: {value}")
+            logger.debug(f"{self}: state: {value}")
         elif key == "label":
             value = str(value)
             logger.debug(f"{self}: label: {value}")
