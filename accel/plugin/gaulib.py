@@ -84,7 +84,7 @@ def check_bonding(
                 invalid_atoms.append(a)
         if len(invalid_atoms) > acceptable_invalid_atoms:
             logger.info(f"atoms {invalid_atoms} are out of range")
-            c.state = False
+            c.deactivate("check_bonding")
 
 
 def read_nmr(box: BoxCore):
