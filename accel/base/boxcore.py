@@ -54,24 +54,6 @@ class BoxCore:
             logger.error(f"invalid arg: {arg}")
             raise ValueError
 
-    # for backward compatibility
-    @property
-    def _mols(self) -> Systems:
-        logger.error("_mols is deprecated: use contents")
-        return self.contents
-
-    # for backward compatibility
-    @property
-    def mols(self) -> Systems:
-        logger.error("mols is deprecated: use get()")
-        return self.contents.has_state(True)
-
-    # for backward compatibility
-    @property
-    def allmols(self) -> Systems:
-        logger.error("allmols is deprecated: use get(None)")
-        return self.contents.has_state(None)
-
     def __len__(self) -> int:
         return len(self.contents)
 
@@ -206,8 +188,7 @@ class BoxCore:
         max_limit = int(max_limit)
         if in_label:
             if len(self.get()) != len(self.get().has_label()):
-                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.1.12")
-                # self.labeling()
+                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.2.0")
             for cs in self.get().labels.values():
                 min_e = min(c.energy for c in cs)
                 logger.info(f"the minimun energy: {min_e}")
@@ -240,8 +221,7 @@ class BoxCore:
     def calc_rel_energy(self, in_label: bool = True):
         if in_label:
             if len(self.get()) != len(self.get().has_label()):
-                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.1.12")
-                # self.labeling()
+                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.2.0")
             for cs in self.get().labels.values():
                 min_e = min(c.energy for c in cs)
                 logger.info(f"the minimun energy: {min_e}")
@@ -275,8 +255,7 @@ class BoxCore:
 
         if in_label:
             if len(self.get()) != len(self.get().has_label()):
-                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.1.12")
-                # self.labeling()
+                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.2.0")
             for cs in self.get().labels.values():
                 _calc_distr(cs)
         else:
@@ -377,8 +356,7 @@ class BoxCore:
         if not calc_all:
             cfs = []
             if len(self.get()) != len(self.get().has_label()):
-                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.1.12")
-                # self.labeling()
+                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.2.0")
             for _confs in self.get().labels.values():
                 cfs.append(_confs.get())
                 if len(_confs) != 1:
@@ -578,8 +556,7 @@ class BoxCore:
     def only_minimum(self, in_label: bool = True):
         if in_label:
             if len(self.get()) != len(self.get().has_label()):
-                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.1.12")
-                # self.labeling()
+                logger.info("Breaking Change: Automatic labeling has been eliminated: version 0.2.0")
             for cs in self.get().labels.values():
                 sorted_cs_list: list[System] = sorted(cs, key=lambda c: c.energy)
                 for c in sorted_cs_list[1:]:
