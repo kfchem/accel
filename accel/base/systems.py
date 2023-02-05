@@ -208,7 +208,7 @@ class Systems(MutableSequence):
             raise ValueError
 
     def __str__(self):
-        return f"Box having {len(self._list)} conformers"
+        return f"Systems: {len(self._list)} system"
 
     def __getitem__(self, index) -> System:
         return self._list[index]
