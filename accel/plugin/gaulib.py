@@ -375,7 +375,7 @@ def run(c: System):
         _out = proc.stdout.decode("utf-8").split("\n")
         logger.info(f"finished: {c.name}: {_out}")
     except subprocess.CalledProcessError:
-        c.state = False
+        c.deactivate("g16_run")
         logger.error(f"failed: {c.name}: {''.join(cmd)}")
 
 
@@ -385,7 +385,7 @@ def submit(c: System):
         subprocess.Popen(cmd, cwd=str(c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         logger.info(f"submited: {c.name}: {''.join(cmd)}")
     except subprocess.CalledProcessError:
-        c.state = False
+        c.deactivate("g16_submit")
         logger.error(f"failed: {c.name}: {''.join(cmd)}")
 
 
@@ -642,14 +642,14 @@ class GauBox(BoxCore):
     def is_input(self):
         for c in self.get():
             if not is_g16_input(c.path):
-                c.state = False
+                c.deactivate("g16_is_input")
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_output(self):
         for c in self.get():
             if not is_g16_output(c.path):
-                c.state = False
+                c.deactivate("g16_is_output")
         logger.debug(f"done: {str(self)}")
         return self
 

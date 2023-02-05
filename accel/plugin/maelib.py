@@ -276,13 +276,13 @@ class MaeBox(BoxCore):
     def is_mae_format(self):
         for c in self.get():
             if not is_mae_format(c.path):
-                c.state = False
+                c.deactivate("is_mae_format")
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_maegz_format(self):
         for c in self.get():
             if not is_maegz_format(c.path):
-                c.state = False
+                c.deactivate("is_maegz_format")
         logger.debug(f"done: {str(self)}")
         return self

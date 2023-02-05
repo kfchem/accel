@@ -20,7 +20,7 @@ def check_optimized(box: BoxCore):
             logger.debug(f"ORCA: {c.path.name} was optimized successfully")
         else:
             logger.info(f"ORCA: {c.path.name} was NOT optimized successfully")
-            c.state = False
+            c.deactivate("orca_check_optimized")
 
 
 def read_energy(c: System):
@@ -94,7 +94,7 @@ def run(c: System):
         _out = proc.stdout.decode("utf-8").split("\n")
         logger.info(f"finished: {c.name}: {_out}")
     except subprocess.CalledProcessError:
-        c.state = False
+        c.deactivate("orca_run")
         logger.error(f"failed: {c.name}: {''.join(cmd_txts)}")
 
 
@@ -108,7 +108,7 @@ def submit(c: System):
         subprocess.Popen(cmd_txts, cwd=str(c.path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         logger.info(f"submited: {c.name}: {''.join(cmd_txts)}")
     except subprocess.CalledProcessError:
-        c.state = False
+        c.deactivate("orca_submit")
         logger.error(f"failed: {c.name}: {''.join(cmd_txts)}")
 
 
@@ -152,14 +152,14 @@ class OrcBox(BoxCore):
     def is_input(self):
         for c in self.get():
             if not is_orca_input(c.path):
-                c.state = False
+                c.deactivate("orca_is_input")
         logger.debug(f"done: {str(self)}")
         return self
 
     def is_output(self):
         for c in self.get():
             if not is_orca_output(c.path):
-                c.state = False
+                c.deactivate("orca_is_output")
         logger.debug(f"done: {str(self)}")
         return self
 

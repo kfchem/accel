@@ -19,7 +19,7 @@ def read_total_free_energy(box: BoxCore):
             c.energy = Units.hartree(float(ls[position_idx].split()[4])).to_kcal_mol
         else:
             logger.error(f"xTB: {c.path.name}: the energy entry was not found")
-            c.state = False
+            c.deactivate("xtb_read_free_energy")
 
 
 @FileType.add("app/xtb/output", 50)

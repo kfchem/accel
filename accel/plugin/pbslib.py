@@ -15,7 +15,7 @@ def que_submit(c: System):
         joc_id = joc_id.stdout.decode("utf-8").replace("\n", "")
         logger.info(f"qsub: {c.path.name} was submitted")
     except subprocess.CalledProcessError:
-        c.state = False
+        c.deactivate("pbs_submit")
         joc_id = "Submission Error"
         logger.error(f"qsub: failed submission of {c.path.name}")
     c.data["jobid"] = joc_id
