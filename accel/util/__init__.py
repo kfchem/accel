@@ -9,7 +9,9 @@ __all__ = ["FileType", "Log", "Units", "Execmd"]
 try:
     import_module("tkinter")
 except ImportError:
-    pass
+    from accel.util.dialogue import Dialog
+
+    __all__ += ["Dialog"]
 else:
     from accel.util.dialog import Dialog
 
