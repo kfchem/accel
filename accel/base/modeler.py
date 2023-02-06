@@ -982,6 +982,10 @@ def _get_maps(
     return canonical_recursive_extended_chains.values()
 
 
+def _correct_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]]) -> list[list[tuple[Atom]]]:
+    return atom_maps
+
+
 def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]]) -> list[list[tuple[Atom]]]:
     def aconv(atom: Atom, a_map: list[tuple[Atom]]) -> Atom:
         try:
@@ -1032,6 +1036,12 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
             return False
         else:
             return True
+
+    def det_chirality(a: Atom, b: Atom, c: Atom, d: Atom) -> bool:
+        neighbors_xyz = np.array([atom_.xyz for atom_ in [b, c, d]]) - np.array(a.xyz)
+        if np.linalg.det(neighbors_xyz) > 0:
+            return True
+        return False
 
     evaluated_dicts = [{"map": mp} for mp in atom_maps]
     for evaluated_dic in evaluated_dicts:
@@ -1184,9 +1194,33 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
                 else:
                     stack.append(my_neighbor)
 
+        evaluated_dic["invalid_sn2_atoms"] = 0
+        for pr in bonding_pairs:
+            if pr[0].symbol != pr[1].symbol:
+                continue
+            a_singles = pr[0].single
+            b_singles = pr[1].single
+            if len(a_singles) != 4 or len(b_singles) != 4:
+                continue
+            aconv_from_a = [aconv(a, atom_map) for a in a_singles]
+            aconv_from_b = [aconv(b, atom_map) for b in b_singles]
+            diff_a_atoms = [a for a in a_singles if a not in aconv_from_b]
+            diff_b_atoms = [b for b in b_singles if b not in aconv_from_a]
+            if len(diff_a_atoms) != 1 or len(diff_b_atoms) != 1:
+                continue
+            if diff_a_atoms[0].symbol == "H" or diff_b_atoms[0].symbol == "H":
+                continue
+            if diff_a_atoms[0].symbol == "C" and diff_b_atoms[0].symbol == "C":
+                continue
+            a_ord_atoms = [a for a in a_singles if a not in diff_a_atoms]
+            b_ord_atoms = [aconv(a, atom_map) for a in a_ord_atoms]
+            if det_chirality(*(a_ord_atoms + diff_a_atoms)) == det_chirality(*(b_ord_atoms + diff_b_atoms)):
+                evaluated_dic["invalid_sn2_atoms"] += 1
+
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["local_rmsd"])
     # evaluated_dicts = sorted(evaluated_dicts, key=lambda d: round(d["bonding_local_rmsd"] * 0.5, 3))
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: round(d["bonding_tb_local_rmsd"], 1))
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["invalid_sn2_atoms"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["sp2_face_transfer_mismatch"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["num_of_long_rearranged_atoms"])
     return_list = []
@@ -1194,10 +1228,11 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
         mp = [(pr[0].number, pr[1].number) for pr in evaluated_dic["map"]]
         return_list.append(evaluated_dic["map"])
         logger.info(f"mapping: {mp}")
-        logger.info(f"sp2_face_transfer_mismatch: {evaluated_dic['sp2_face_transfer_mismatch']}")
         logger.info(f"num_of_long_rearranged_atoms: {evaluated_dic['num_of_long_rearranged_atoms']}")
-        logger.info(f"bonding_local_rmsd: {evaluated_dic['bonding_local_rmsd']}")
+        logger.info(f"sp2_face_transfer_mismatch: {evaluated_dic['sp2_face_transfer_mismatch']}")
+        logger.info(f"invalid_sn2_atoms: {evaluated_dic['invalid_sn2_atoms']}")
         logger.info(f"bonding_tb_local_rmsd: {evaluated_dic['bonding_tb_local_rmsd']}")
+        # logger.info(f"bonding_local_rmsd: {evaluated_dic['bonding_local_rmsd']}")
         logger.info(f"local_rmsd: {evaluated_dic['local_rmsd']}")
 
     return return_list
