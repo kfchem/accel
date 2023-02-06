@@ -53,6 +53,23 @@ class XtbBox(BoxCore):
         logger.debug(f"done: {str(self)}")
         return self
 
+    @Selectors.read_thermal.add("app/xtb/output")
+    def read_thermal(self):
+        for c in self.get():
+            with c.path.open(encoding="utf-8") as f:
+                ls = f.readlines()
+            for line in ls:
+                if ":: total free energy" in line:
+                    c.data["xtb_total_free_energy"] = float(line.split()[4])
+                if ":: zero point energy" in line:
+                    c.data["xtb_zpe"] = float(line.split()[4])
+                if ":: G(RRHO) w/o ZPVE" in line:
+                    c.data["xtb_g_rrho_wo_zpve"] = float(line.split()[4])
+                if ":: G(RRHO) contrib." in line:
+                    c.data["xtb_g_rrho_contrib"] = float(line.split()[3])
+        logger.debug(f"done: {str(self)}")
+        return self
+
     @Selectors.read_energy.add("app/xtb/output")
     def read_energy(self):
         for c in self.get():
