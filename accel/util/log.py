@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+
 from accel import __version__
 
 
@@ -31,7 +32,7 @@ class Log:
         if directory.exists() and directory.is_dir():
             cls.output_dir = directory
 
-    temp_file = tempfile.TemporaryFile("a+")
+    temp_file = tempfile.SpooledTemporaryFile(1024, "a+")
     temp_handler = logging.StreamHandler(temp_file)
     temp_handler.setLevel(logging.DEBUG)
     temp_handler.setFormatter(logging.Formatter("%(asctime)s: %(levelname)s: %(funcName)s: %(message)s"))
