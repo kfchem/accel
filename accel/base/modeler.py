@@ -812,26 +812,33 @@ def _get_maps(
                     tree.append(set())
                     for _a in tree[-2]:
                         tree[-1].update(_a.bonds)
-
                 dup_atoms = trees[0][-1]
                 for tree in trees:
                     dup_atoms = dup_atoms & tree[-1]
                 for tree in trees:
                     tree[-1] = tree[-1] - dup_atoms
-                weights = []
-                for tree in trees:
-                    weights.append(len(tree[-1]))
-                if max(weights) == 0:
+                if max([len(tree[-1]) for tree in trees]) == 0:
                     return [list(tree[0])[0] for tree in trees]
-                alive_trees = []
-                for tree_idx, weight in enumerate(weights):
-                    if weight == max(weights):
-                        alive_trees.append(trees[tree_idx])
-                if len(alive_trees) == 1:
-                    return list(alive_trees[0][0])
-                trees = alive_trees
+                symbol_idxs_dict: dict[int, list[list[int]]] = {}
+                all_symbol_set: set[int] = set()
+                for idx, tree in enumerate(trees):
+                    symbol_idxs_dict[idx] = [Elements.symbols.index(a.symbol) for a in tree[-1]]
+                    all_symbol_set.update(symbol_idxs_dict[idx])
+                for s_idx in sorted(list(all_symbol_set), reverse=True):
+                    symbol_idxs_counts = {
+                        idx: symbol_idxs.count(s_idx) for idx, symbol_idxs in symbol_idxs_dict.items()
+                    }
+                    max_count = max(symbol_idxs_counts.values())
+                    symbol_idxs_dict = {
+                        idx: symbol_idxs
+                        for idx, symbol_idxs in symbol_idxs_dict.items()
+                        if symbol_idxs_counts[idx] == max_count
+                    }
+                    if len(symbol_idxs_dict) == 1:
+                        return list(trees[list(symbol_idxs_dict.keys())[0]][0])
+                trees = [trees[idx] for idx in symbol_idxs_dict.keys()]
             else:
-                return [list(tree[0])[0] for tree in alive_trees]
+                return [list(tree[0])[0] for tree in trees]
 
         while stack:
             root_pair: tuple[Atom] = stack.popleft()
