@@ -31,7 +31,7 @@ def que_wait(box: BoxCore, interval_time=10):
         proc = subprocess.run([Execmd.get("qstat")], stdout=subprocess.PIPE)
         proc_list = proc.stdout.decode("utf-8").split("\n")
         proc_list = [_l.split()[0] for _l in proc_list[2:] if len(_l) != 0]
-        for job_id in job_ids:
+        for job_id in job_ids[:]:
             if not (job_id in proc_list):
                 job_ids.remove(job_id)
                 logger.info(f"Job ID {job_id} was completed")
