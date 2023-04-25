@@ -470,13 +470,15 @@ class Modeler:
                 rot_mat = a.cache["isomeric_subs_list"][0]["matrix"]
                 rot_mat = rot_mat.astype(int)
                 rotamer_mat_list.append(rot_mat)
-            elif [len(a.bonds), len(a.cache["isomeric_subs_list"])] in [[4, 3], [4, 6]]:
+            elif [len(a.bonds), len(a.cache["isomeric_subs_list"])] in [[4, 3], [4, 6], [3, 3]]:
                 for _ps in a.cache["isomeric_subs_list"][1:]:
                     rot_mat = np.dot(_ps["matrix"], a.cache["isomeric_subs_list"][0]["matrix"])
                     rot_mat = rot_mat.astype(int)
                     rotamer_mat_list.append(rot_mat)
                 for _ps in a.cache["isomeric_subs_list"]:
                     numisomer_mat_list.append(_ps["matrix"])
+                if [len(a.bonds), len(a.cache["isomeric_subs_list"])] in [[3, 3]]:
+                    rotamer_mat_list.append(a.cache["isomeric_subs_list"][0]["matrix"])
             else:
                 for _ps in a.cache["isomeric_subs_list"]:
                     numisomer_mat_list.append(_ps["matrix"])
@@ -499,15 +501,29 @@ class Modeler:
                     invalid_count += 1
             return invalid_count
 
+        def _get_invalid_chiral_atoms(atoms: Atoms, modified_xyz: np.ndarray) -> list[Atom]:
+            original_xyz = np.array([a.xyz for a in atoms])
+            ret_list = []
+            for _a in atoms:
+                if len(_a.bonds) != 4:
+                    continue
+                _b_indexs = sorted(a.number - 1 for a in _a.bonds)
+                original_matirix = original_xyz[_b_indexs[1:]] - original_xyz[_b_indexs[0]]
+                modified_matirix = modified_xyz[_b_indexs[1:]] - modified_xyz[_b_indexs[0]]
+                if (np.linalg.det(original_matirix) > 0) != (np.linalg.det(modified_matirix) > 0):
+                    ret_list.append(_a)
+            return ret_list
+
         # for TMS, cyclic_chiral_check has error
-        def _cyclic_chiral_check(atoms: Atoms, rotamer_mat_list, numisomer_mat_list):
+        def _cyclic_chiral_check_legacy(atoms: Atoms, rotamer_mat_list, numisomer_mat_list):
             unchanged_flag = True
             for rm_idx, rot_mat in enumerate(rotamer_mat_list):
                 original_xyz = np.array([at.xyz for at in atoms])
                 number_of_invalid = _invalid_chirality(atoms, np.dot(rot_mat, original_xyz))
+                logger.debug(f"number of invalid chirality for rotemer matrix {rm_idx} is {number_of_invalid}")
                 if number_of_invalid == 0:
                     continue
-                for num_mat in numisomer_mat_list:
+                for num_mat in reversed(numisomer_mat_list):
                     t_mat = np.dot(num_mat, rot_mat)
                     if _invalid_chirality(atoms, np.dot(t_mat, original_xyz)) < number_of_invalid:
                         rotamer_mat_list[rm_idx] = t_mat
@@ -518,13 +534,41 @@ class Modeler:
                     logger.debug("chirality in rotamer matrix temporarily corrected")
             return unchanged_flag
 
+        def _cyclic_chiral_check(atoms: Atoms, rotamer_mat_list, numisomer_mat_list):
+            unchanged_flag = True
+            for rm_idx, rot_mat in enumerate(rotamer_mat_list):
+                original_xyz = np.array([at.xyz for at in atoms])
+                invalid_atoms = _get_invalid_chiral_atoms(atoms, np.dot(rot_mat, original_xyz))
+                if len(invalid_atoms) == 0:
+                    continue
+                logger.debug(
+                    f"invalid chiral atom is detected: {[str(ta) for ta in invalid_atoms]} in mat_idx {rm_idx}"
+                )
+                for isosub in invalid_atoms[0].cache["isomeric_subs_list"]:
+                    t_mat = np.dot(isosub["matrix"], rot_mat)
+                    iv_atoms = _get_invalid_chiral_atoms(atoms, np.dot(t_mat, original_xyz))
+                    if len(iv_atoms) < len(invalid_atoms):
+                        rotamer_mat_list[rm_idx] = t_mat
+                        unchanged_flag = False
+                        logger.debug("chirality in rotamer matrix was partially corrected")
+                        break
+                else:
+                    logger.debug("chirality in rotamer matrix not corrected")
+            return unchanged_flag
+
         if len(rotamer_mat_list) != 0:
-            for _ in range(len(rotamer_mat_list)):
-                if _cyclic_chiral_check(self.atoms, rotamer_mat_list, numisomer_mat_list):
-                    logger.debug("chirality in rotamer matrix was successfully corrected")
-                    break
-            else:
-                logger.error("chirality in rotamer matrix was not completely corrected")
+            if not _cyclic_chiral_check(self.atoms, rotamer_mat_list, numisomer_mat_list):
+                for _ in range(len(rotamer_mat_list) * len(numisomer_mat_list)):
+                    if _cyclic_chiral_check(self.atoms, rotamer_mat_list, numisomer_mat_list):
+                        logger.debug("chirality in rotamer matrix was successfully corrected")
+                        break
+                else:
+                    for _ in range(len(rotamer_mat_list) * len(numisomer_mat_list)):
+                        if _cyclic_chiral_check_legacy(self.atoms, rotamer_mat_list, numisomer_mat_list):
+                            logger.debug("chirality in rotamer matrix was successfully corrected by legacy protocol")
+                            break
+                    else:
+                        logger.error("chirality in rotamer matrix was not completely corrected")
 
         # generate identical collections of rot_mat again
         rotamer_mat_list = {_m.tobytes(): _m for _m in rotamer_mat_list}.values()
