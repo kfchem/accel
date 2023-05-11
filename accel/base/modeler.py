@@ -1,5 +1,6 @@
 import math
 from collections import defaultdict, deque
+from collections.abc import MutableSequence
 from statistics import mean
 from typing import Iterable, Sequence
 
@@ -199,6 +200,147 @@ class Modeler:
                     if _mat[index_a, index_b]:
                         self.atoms.bonds[index_a + 1, index_b + 1] = _tyep
         return self
+
+    def calc_stereo(self, with_num_chirality=True):
+        logger.info("calc_stereo is under developement, might be wrong assignment")
+
+        def set_stereo(a: Atom, stereo: str):
+            logger.debug(f"{a}: {stereo}")
+            a.stereo.add(stereo)
+
+        def get_ez(a: Atom, b: Atom, c: Atom, d: Atom) -> str:
+            vab = np.array(a.xyz) - np.array(b.xyz)
+            vcb = np.array(c.xyz) - np.array(b.xyz)
+            vdc = np.array(d.xyz) - np.array(c.xyz)
+            pvac = np.cross(vab, vcb)
+            pvbd = np.cross(vdc, vcb)
+            angle = np.arccos(np.sum(pvac * pvbd) / (np.linalg.norm(pvac) * np.linalg.norm(pvbd)))
+            if np.sum(pvac * np.cross(pvbd, vcb)) < 0:
+                angle = -angle
+            angle = float(np.rad2deg(angle))
+            if angle > 90 or angle < -90:
+                return "E"
+            return "Z"
+
+        def get_rs(a: Atom, b: Atom, c: Atom, d: Atom) -> str:
+            neighbors_xyz = np.array([atom_.xyz for atom_ in [a, b, c]]) - np.array(d.xyz)
+            if np.linalg.det(neighbors_xyz) > 0:
+                return "S"
+            return "R"
+
+        def det_allene_chirality(a: Atom, b: Atom, c: Atom):
+            if len(b.single) >= 1 or len(b.double) != 2:
+                return None
+            a_singles = a.single
+            c_singles = c.single
+            if len(a_singles) != 2 or len(c_singles) != 2:
+                return None
+            a_subs = Chains.get_ordered_substituents([Chains([(a, a_single)]) for a_single in a_singles])
+            c_subs = Chains.get_ordered_substituents([Chains([(a, c_single)]) for c_single in c_singles])
+            if None in [a_subs, c_subs]:
+                return None
+            chirality = get_rs(*[chain[0][1] for chain in a_subs + c_subs])
+            if chirality is None:
+                return None
+            else:
+                return chirality + "a"
+
+        def det_allene_num_chirality(a: Atom, b: Atom, c: Atom):
+            if len(b.single) >= 1 or len(b.double) != 2:
+                return None
+            a_singles = a.single
+            c_singles = c.single
+            if len(a_singles) != 2 or len(c_singles) != 2:
+                return None
+            ordered_atoms: list[Atom] = sorted(a_singles, key=lambda a: a.number)
+            ordered_atoms.extend(sorted(c_singles, key=lambda a: a.number))
+            chirality = get_rs(*ordered_atoms)
+            if chirality is None:
+                return None
+            else:
+                return "n" + chirality + "a"
+
+        for root_atom in self.atoms:
+            root_atom.stereo = set()
+        for root_atom in self.atoms:
+            root_atom_bonds = root_atom.bonds
+            if len(root_atom_bonds) == 2:
+                db_bond = root_atom.double
+                if len(db_bond) == 2:
+                    allene_chirality = det_allene_chirality(db_bond[0], root_atom, db_bond[1])
+                    if allene_chirality is not None:
+                        set_stereo(db_bond[0], allene_chirality)
+                        set_stereo(root_atom, allene_chirality)
+                        set_stereo(db_bond[1], allene_chirality)
+                if len(db_bond) == 2 and with_num_chirality:
+                    allene_chirality = det_allene_num_chirality(db_bond[0], root_atom, db_bond[1])
+                    if allene_chirality is not None:
+                        set_stereo(db_bond[0], allene_chirality)
+                        set_stereo(root_atom, allene_chirality)
+                        set_stereo(db_bond[1], allene_chirality)
+                if len(db_bond) != 1:
+                    continue
+                if len(root_atom.single) != 1:
+                    continue
+                if len(db_bond[0].single) not in (2, 1):
+                    continue
+                if with_num_chirality:
+                    db_next = sorted(db_bond[0].single, key=lambda a: a.number, reverse=True)[0]
+                    chiral = "n" + get_ez(root_atom.single[0], root_atom, db_bond[0], db_next) + "i"
+                    set_stereo(root_atom, chiral)
+                ba_singles = Chains.get_ordered_substituents([Chains([(db_bond[0], a)]) for a in db_bond[0].single])
+                if ba_singles is None:
+                    continue
+                elif len(ba_singles) in (2, 1):
+                    orderd_atoms = [root_atom.single[0], root_atom, db_bond[0], ba_singles[0][0][1]]
+                    chiral = get_ez(*orderd_atoms) + "i"
+                    set_stereo(root_atom, chiral)
+                else:
+                    logger.error(f"error chiral handling of ez {root_atom}")
+                    root_atom.stereo.add("error")
+            if len(root_atom_bonds) == 3:
+                # aromatic handling
+                db_bond = root_atom.double
+                if len(db_bond) != 1:
+                    continue
+                if len(db_bond[0].single) not in (2, 1):
+                    continue
+                if with_num_chirality:
+                    root_next = sorted(root_atom.single, key=lambda a: a.number, reverse=True)[0]
+                    db_next = sorted(db_bond[0].single, key=lambda a: a.number, reverse=True)[0]
+                    chiral = "n" + get_ez(root_next, root_atom, db_bond[0], db_next)
+                    if len(db_bond[0].single) == 1:
+                        chiral += "i"
+                    set_stereo(root_atom, chiral)
+                ra_singles = Chains.get_ordered_substituents([Chains([(root_atom, a)]) for a in root_atom.single])
+                ba_singles = Chains.get_ordered_substituents([Chains([(db_bond[0], a)]) for a in db_bond[0].single])
+                if None in [ra_singles, ba_singles]:
+                    continue
+                if len(ra_singles) == 2 and len(ba_singles) == 2:
+                    orderd_atoms = [ra_singles[0][0][1], root_atom, db_bond[0], ba_singles[0][0][1]]
+                    chiral = get_ez(*orderd_atoms)
+                    set_stereo(root_atom, chiral)
+                elif len(ra_singles) == 2 and len(ba_singles) == 1:
+                    orderd_atoms = [ra_singles[0][0][1], root_atom, db_bond[0], ba_singles[0][0][1]]
+                    chiral = get_ez(*orderd_atoms) + "i"
+                    set_stereo(root_atom, chiral)
+                else:
+                    logger.error(f"error chiral handling of ez {root_atom}")
+                    root_atom.stereo.add("error")
+            if len(root_atom_bonds) == 4:
+                if with_num_chirality:
+                    chiral = "n" + get_rs(*sorted(root_atom_bonds, key=lambda a: a.number, reverse=True))
+                    set_stereo(root_atom, chiral)
+                ordered_subs = Chains.get_ordered_substituents([Chains([(root_atom, a)]) for a in root_atom_bonds])
+                if ordered_subs is None:
+                    continue
+                if len(ordered_subs) == 4:
+                    orderd_atoms: list[Atom] = [sub[0][1] for sub in ordered_subs]
+                    chiral = get_rs(*orderd_atoms)
+                    set_stereo(root_atom, chiral)
+                else:
+                    logger.error(f"error chiral handling of rs {root_atom}")
+                    root_atom.stereo.add("error")
 
     def merge(self, atoms: Atoms):
         p_len = len(self.atoms)
@@ -601,7 +743,6 @@ def _get_maps(
     exclude_known: bool = False,
     terminal_first: bool = False,
 ) -> list[list[tuple[Atom]]]:
-
     if len(known_pairs) == 0:
         known_check = False
         given_known_as = []
@@ -1359,7 +1500,212 @@ def _cal_sym_rmsd(
     return min_rmsd
 
 
-def _order_by_cip(substitutions: list[Atom], roots: list[Atom]):
-    for sub in substitutions:
+def _is_heavy(atom_heavy: Atom, atom_light: Atom):
+    heavy_idx = Elements.symbols.index(atom_heavy.symbol)
+    light_idx = Elements.symbols.index(atom_light.symbol)
+    if heavy_idx > light_idx:
+        return True
+    elif heavy_idx < light_idx:
+        return False
+    return None
+
+
+class Chains(MutableSequence):
+    def __init__(self, chains: list[tuple[Atom]] = []) -> None:
+        self._chains: list[tuple[Atom]] = chains[:]
+
+    def __getitem__(self, idx: int) -> tuple[Atom]:
+        return self._chains[idx]
+
+    def __setitem__(self, idx: int, chain: tuple[Atom]):
+        self._chains[idx] = chain
+
+    def __delitem__(self, idx: int):
+        del self._chains[idx]
+
+    def __len__(self):
+        return len(self._chains)
+
+    def insert(self, idx: int, chain: tuple[Atom]):
+        self._chains.insert(idx, chain)
+
+    def __add__(self, other: "Chains"):
+        if not isinstance(other, Chains):
+            raise TypeError
+        return Chains(self._chains + other._chains)
+
+    def __iter__(self):
+        return self._chains.__iter__()
+
+    @staticmethod
+    def is_same_substituent(chain_a: tuple[Atom], chain_b: tuple[Atom]):
+        return (chain_a[0] is chain_b[0]) and (chain_a[1] is chain_b[1])
+
+    @staticmethod
+    def is_higher(chain_high: tuple[Atom], chain_low: tuple[Atom]):
+        zipped = list(zip(chain_high, chain_low))
+        for ha, la in zipped:
+            is_heavy = _is_heavy(ha, la)
+            if is_heavy is None:
+                continue
+            if is_heavy:
+                return True
+            else:
+                return False
+        if len(chain_high) > len(chain_low):
+            return True
+        elif len(chain_high) < len(chain_low):
+            return False
+        symb_dict_high: dict[str, float] = defaultdict(float)
+        symb_dict_low: dict[str, float] = defaultdict(float)
+        for chain, symb_dict in [(chain_high, symb_dict_high), (chain_low, symb_dict_low)]:
+            for a in chain[-1].single:
+                symb_dict[a.symbol] += 1
+            for a in chain[-1].double:
+                symb_dict[a.symbol] += 2
+            for a in chain[-1].triple:
+                symb_dict[a.symbol] += 3
+            for a in chain[-1].aromatic:
+                symb_dict[a.symbol] += 1.5
+            if len(chain) >= 2:
+                symb_dict[chain[-2].symbol] -= 1
+        symbidx_dict_high: dict[int, float] = {Elements.symbols.index(s): v for s, v in dict(symb_dict_high).items()}
+        symbidx_dict_low: dict[int, float] = {Elements.symbols.index(s): v for s, v in dict(symb_dict_low).items()}
+        symbidxs: list[int] = sorted(list(set(symbidx_dict_high.keys()) | set(symbidx_dict_low.keys())), reverse=True)
+        for idx in symbidxs:
+            order_high = symbidx_dict_high.get(idx, 0)
+            order_low = symbidx_dict_low.get(idx, 0)
+            if order_high > order_low:
+                return True
+            elif order_high < order_low:
+                return False
+        return None
+
+    @property
+    def max_distance(self):
+        return max([len(chain) - 1 for chain in self._chains])
+
+    def elongated(self, accept_loop: bool = False) -> "Chains":
+        new_chains = Chains()
+        for chain in self._chains:
+            for a in chain[-1].bonds:
+                if a is chain[-2]:
+                    continue
+                if not accept_loop:
+                    if a in chain:
+                        continue
+                new_chains.append(chain + (a,))
+        return new_chains
+
+    def expanded(self, accept_loop=False, max_elongation=128) -> "Chains":
+        new_chains = Chains(self._chains)
+        for _ in range(max_elongation):
+            terminal_chains = self.elongated(accept_loop=accept_loop)
+            if len(terminal_chains) == 0:
+                break
+            new_chains.extend(terminal_chains)
+        return new_chains
+
+    def longest(self) -> "Chains":
+        max_len = self.max_distance() + 1
+        return Chains([chain for chain in self._chains if len(chain) == max_len])
+
+    def heavily_terminated(self) -> "Chains":
+        symbs = set([chain[-1].symbol for chain in self._chains])
+        max_symbol = Elements.canonicalize(max([Elements.symbols.index(s) for s in symbs]))
+        return Chains([chain for chain in self._chains if chain[-1].symbol == max_symbol])
+
+    @property
+    def terminals(self) -> list[Atom]:
+        return [chain[-1] for chain in self._chains]
+
+    @property
+    def terminal_neighbors(self) -> list[list[Atom]]:
+        return [chain[-1].bonds for chain in self._chains]
+
+    @property
+    def length_of_substituent(self) -> int:
         pass
-    return []
+
+    def sort(self):
+        for i in range(1, len(self._chains)):
+            for j in range(0, len(self._chains) - i):
+                if Chains.is_higher(self._chains[j], self._chains[j + 1]) is False:
+                    self._chains[j], self._chains[j + 1] = self._chains[j + 1], self._chains[j]
+
+    @staticmethod
+    def get_ordered_substituents(initial_chains_list: list["Chains"]) -> list["Chains"]:
+        sorted_chains_list: list[Chains] = []
+        if len(initial_chains_list) == 0:
+            return sorted_chains_list
+        if len(initial_chains_list) == 1:
+            sorted_chains_list.append(initial_chains_list[0])
+            return sorted_chains_list
+        max_distance = max([chains.max_distance for chains in initial_chains_list])
+        if max_distance > 64:
+            logger.error("exceeded max recursive iteration")
+            return None
+
+        t_chains_list = [Chains(initial_chains._chains[:]) for initial_chains in initial_chains_list]
+        for t_chains in t_chains_list:
+            t_chains.sort()
+        for _ in range(len(t_chains_list)):
+            if len(t_chains_list) in [0, 1]:
+                break
+            higher_chains = [t_chains[0] for t_chains in t_chains_list]
+            max_chains = [higher_chains[0]]
+            for chain in higher_chains[1:]:
+                for mxchain in max_chains[:]:
+                    flag = Chains.is_higher(chain, mxchain)
+                    if flag is True:
+                        max_chains = [chain]
+                        break
+                    elif flag is None:
+                        max_chains.append(chain)
+            if len(max_chains) == 1:
+                sorted_chains_list.extend(
+                    [chains for chains in initial_chains_list if chains[0][1] == max_chains[0][1]]
+                )
+                for t_chains in t_chains_list[:]:
+                    if t_chains[0][1] == max_chains[0][1]:
+                        t_chains_list.remove(t_chains)
+            elif len(max_chains) >= 2:
+                pass
+            else:
+                break
+            for max_chain in max_chains:
+                for t_chains in t_chains_list:
+                    if max_chain in t_chains._chains:
+                        t_chains._chains.remove(max_chain)
+            t_chains_list = [t_chains for t_chains in t_chains_list if len(t_chains) != 0]
+
+        next_chains_list: list[Chains] = []
+        elongated_flag = False
+        for chains in initial_chains_list:
+            for sorted_chains in sorted_chains_list:
+                if chains[0][1] == sorted_chains[0][1]:
+                    break
+            else:
+                elongated_chains = chains.elongated()
+                for chain in chains:
+                    if chain in elongated_chains:
+                        elongated_chains.remove(chain)
+                if len(elongated_chains) != 0:
+                    elongated_flag = True
+                    next_chains_list.append(chains + elongated_chains)
+                else:
+                    next_chains_list.append(chains)
+        if len(next_chains_list) == 1:
+            sorted_chains_list.extend(next_chains_list)
+            return sorted_chains_list
+        if len(next_chains_list) == 0 or elongated_flag is False:
+            return None
+        ordered_chains_list = Chains.get_ordered_substituents(next_chains_list)
+        if ordered_chains_list is None:
+            return None
+        for chains in ordered_chains_list:
+            for initial_chains in initial_chains_list:
+                if chains[0][1] == initial_chains[0][1]:
+                    sorted_chains_list.append(initial_chains)
+                    break
+        return sorted_chains_list

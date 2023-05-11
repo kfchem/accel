@@ -352,6 +352,13 @@ class BoxCore:
         logger.debug(f"done: {str(self)}")
         return self
 
+    def calc_stereo(self, with_num_chirality: bool = True):
+        for c in self.get():
+            logger.debug(f"{c.name}: calculating chirality")
+            c.modeler.calc_stereo(with_num_chirality=with_num_chirality)
+        logger.debug(f"done: {str(self)}")
+        return self
+
     def calc_symm(self, calc_all: bool = True):
         if not calc_all:
             cfs = []

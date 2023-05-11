@@ -4,6 +4,7 @@ from collections.abc import MutableSequence
 from typing import Iterable, Iterator, MutableMapping, Sequence, Set, Tuple
 
 import numpy as np
+
 from accel.util.constants import Elements
 from accel.util.datadict import Data
 from accel.util.log import logger
@@ -45,6 +46,7 @@ class Atom:
         "data",
         "cache",
         "charge",
+        "stereo",
         "parent",
     ]
 
@@ -59,6 +61,7 @@ class Atom:
         self.data = Data(self)
         self.cache = {}
         self.charge: int = None
+        self.stereo: set = None
         self.parent: Atoms = parent
 
     def __str__(self):
@@ -159,6 +162,7 @@ class Atom:
         n.data = self.data.duplicate(n)
         n.cache = copy.deepcopy(self.cache)
         n.charge = self.charge
+        n.stereo = self.stereo
         return n
 
     def show(self):
@@ -169,6 +173,7 @@ class Atom:
         data_dict["y"] = self.y
         data_dict["z"] = self.y
         data_dict["charge"] = self.charge
+        data_dict["stereo"] = self.stereo
         data_dict["bonds"] = [str(_a) for _a in self.bonds]
         data_dict["single"] = [str(_a) for _a in self.single]
         data_dict["double"] = [str(_a) for _a in self.double]
