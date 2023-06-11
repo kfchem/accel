@@ -202,7 +202,7 @@ class Modeler:
         return self
 
     def calc_stereo(self, with_num_chirality=True):
-        logger.info("calc_stereo is under developement, might be wrong assignment")
+        logger.debug("calc_stereo is under developement, might be wrong assignment")
 
         def set_stereo(a: Atom, stereo: str):
             logger.debug(f"{a}: {stereo}")
@@ -413,6 +413,7 @@ class Modeler:
         terminal_first: bool = False,
     ) -> list[list[int]]:
         atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
+        atoms_map = _expand_maps(target, self.atoms, atoms_map)
         atoms_map = _order_maps(target, self.atoms, atoms_map)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
@@ -1226,6 +1227,9 @@ def _expand_maps(
             ]
             stored_loop_atoms = []
             while loop_rest_que:
+                if len(loop_rest_que) > 1024:
+                    logger.error("loop_rest_que reached 1024: exiting loop")
+                    break
                 q = loop_rest_que.pop(0)
                 loop_atoms: tuple[Atom] = q["loop_atoms"]
                 rest_bonds: list[tuple[Atom]] = q["rest_bonds"]
@@ -1517,11 +1521,9 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
 
         evaluated_dic["sp3_carbon_penalty"] = 0
         for pr in bonding_pairs:
-            if pr[0].symbol != "C" and pr[1].symbol != "C":
+            if pr[0].symbol != "C" or pr[1].symbol != "C":
                 continue
-            a_singles = pr[0].single
-            b_singles = pr[1].single
-            if len(a_singles) == 4 and len(b_singles) == 4:
+            if len(pr[0].single) == 4 and len(pr[1].single) == 4:
                 evaluated_dic["sp3_carbon_penalty"] += 1
 
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["local_rmsd"])
