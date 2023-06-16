@@ -1,3 +1,4 @@
+import itertools
 import math
 from collections import defaultdict, deque
 from collections.abc import MutableSequence
@@ -939,6 +940,31 @@ def _get_maps(
     # for chain in h_matched_canonical_initial_chains:
     #     logger.debug(f"h_matched_canonical_initial_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
+    if (
+        len(h_matched_canonical_initial_chains) != 1
+        and max([len(chain) for chain in h_matched_canonical_initial_chains]) == 1
+    ):
+        logger.debug(f"generating combination_chains from {len(h_matched_canonical_initial_chains)} chains")
+        # for chain in h_matched_canonical_initial_chains:
+        #     logger.debug(f"original hmc_initial_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
+        sole_chains = [chain[0] for chain in h_matched_canonical_initial_chains]
+        max_combs: list[list[tuple[Atom]]] = []
+        for length in reversed(list(range(1, len(sole_chains) + 1))):
+            for comb in itertools.combinations(sole_chains, length):
+                if len({cb[0] for cb in comb}) != length:
+                    continue
+                if len({cb[1] for cb in comb}) != length:
+                    continue
+                max_combs.append(list(comb))
+            if len(max_combs) != 0:
+                break
+        if len(max_combs) == 0:
+            logger.debug("not found appropriate combination")
+        else:
+            h_matched_canonical_initial_chains = max_combs
+            # for chain in h_matched_canonical_initial_chains:
+            #     logger.debug(f"new hmc_initial_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
+
     def _det_ez(a: Atom, b: Atom, c: Atom, d: Atom) -> bool:
         vab = np.array(a.xyz) - np.array(b.xyz)
         vcb = np.array(c.xyz) - np.array(b.xyz)
@@ -1181,7 +1207,12 @@ def _get_maps(
 
 
 def _expand_maps(
-    atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]], max_loop: int = 3
+    atoms_a: "Atoms",
+    atoms_b: "Atoms",
+    atom_maps: list[list[tuple[Atom]]],
+    max_loop: int = 4,
+    max_different_bonds: int = 8,
+    max_loop_rest_que: int = 8192,
 ) -> list[list[tuple[Atom]]]:
     def ab_conv(atom: Atom, atom_map: list[tuple[Atom]]) -> Atom:
         try:
@@ -1204,10 +1235,10 @@ def _expand_maps(
         key = tuple(sorted([(mp[0].number, mp[1].number) for mp in atom_map], key=lambda t: t[0]))
         total_atom_maps_dict[key] = atom_map
     for initial_atom_map in atom_maps:
-        que_atom_maps = [initial_atom_map]
+        que_atom_maps = [(initial_atom_map, max_different_bonds)]
         loop_counter = 0
         while que_atom_maps:
-            atom_map = que_atom_maps.pop(0)
+            atom_map, max_diff_bonds = que_atom_maps.pop(0)
             potential_swaps: list[list[Atom]] = []
             a_diff_bonds: list[tuple[Atom]] = []
             for ab_map in atom_map:
@@ -1217,6 +1248,9 @@ def _expand_maps(
                     a_diff_bonds.append((ab_map[0], a_diff_bd))
             a_diff_bonds = list(set([tuple(sorted(adb, key=lambda a: a.number)) for adb in a_diff_bonds]))
             # logger.debug(f"a_diff_bonds: {[[a.number for a in adb] for adb in a_diff_bonds]}")
+            if len(a_diff_bonds) > max_diff_bonds:
+                # logger.debug(f"len(a_diff_bonds) exceeded last length {max_diff_bonds}")
+                continue
             loop_rest_que: list[dict] = [
                 {
                     "loop_atoms": (adb[0],),
@@ -1227,8 +1261,8 @@ def _expand_maps(
             ]
             stored_loop_atoms = []
             while loop_rest_que:
-                if len(loop_rest_que) > 1024:
-                    logger.error("loop_rest_que reached 1024: exiting loop")
+                if len(loop_rest_que) > max_loop_rest_que:
+                    logger.error(f"loop_rest_que reached {max_loop_rest_que}: exiting loop")
                     break
                 q = loop_rest_que.pop(0)
                 loop_atoms: tuple[Atom] = q["loop_atoms"]
@@ -1260,8 +1294,9 @@ def _expand_maps(
                     potential_swaps.append([a for a in loop_atoms[::2]])
                 if len(set([a.symbol for a in loop_atoms[1::2]])) == 1:
                     potential_swaps.append([a for a in loop_atoms[1::2]])
-            potential_swaps: list[tuple[Atom]] = list(
-                set([tuple(sorted(adb, key=lambda a: a.number)) for adb in potential_swaps])
+            potential_swaps: list[tuple[Atom]] = sorted(
+                list(set([tuple(sorted(adb, key=lambda a: a.number)) for adb in potential_swaps])),
+                key=lambda ap: ap[0].number,
             )
             # logger.debug(f"potential_swap: {[[a.number for a in pswap] for pswap in potential_swaps]}")
             atom_map_a = [m[0] for m in atom_map]
@@ -1280,7 +1315,7 @@ def _expand_maps(
                 if new_map_key not in total_atom_maps_dict:
                     logger.info(f"expanded_chains: {[(pr[0].number, pr[1].number) for pr in new_map]}")
                     total_atom_maps_dict[new_map_key] = new_map
-                    que_atom_maps.append(new_map)
+                    que_atom_maps.append((new_map, len(a_diff_bonds)))
             loop_counter += 1
             if loop_counter >= max_loop:
                 break
