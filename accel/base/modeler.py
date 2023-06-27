@@ -1322,7 +1322,9 @@ def _expand_maps(
     return list(total_atom_maps_dict.values())
 
 
-def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]]) -> list[list[tuple[Atom]]]:
+def _order_maps(
+    atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]], chair=True, light=False
+) -> list[list[tuple[Atom]]]:
     def aconv(atom: Atom, a_map: list[tuple[Atom]]) -> Atom:
         try:
             idx = [pr[0] for pr in a_map].index(atom)
@@ -1348,8 +1350,8 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
         center_to_reactive_vec = np.array(reactive_atom.xyz) - np.array(center_atom.xyz)
         non_rea_atoms = [a for a in center_atom.single if a is not reactive_atom]
         if len(non_rea_atoms) != 3:
-            logger.error("not bearing non reactive 3 bonds")
-            return True
+            # logger.error("not bearing non reactive 3 bonds")
+            return None
         nvec = get_normal_vector(non_rea_atoms[0], non_rea_atoms[1], non_rea_atoms[2])
         st = np.linalg.norm(center_to_reactive_vec) * np.linalg.norm(nvec)
         theta = np.arccos(np.inner(center_to_reactive_vec, nvec) / st)
@@ -1361,11 +1363,31 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
     def get_relationship_flag(atom_x: Atom, atom_y: Atom) -> bool:
         x_neis = atom_x.bonds
         y_neis = atom_y.bonds
-        if len(x_neis) != 3 or len(y_neis) != 3:
-            logger.error("not bearing 3 bonds")
+        if len(x_neis) == 3 and len(y_neis) == 3:
+            xvec = get_normal_vector(x_neis[0], x_neis[1], x_neis[2])
+            yvec = get_normal_vector(y_neis[0], y_neis[1], y_neis[2])
+        elif len(x_neis) == 3 and len(y_neis) == 2:
+            xvec = get_normal_vector(x_neis[0], x_neis[1], x_neis[2])
+            yvec = get_normal_vector(y_neis[0], y_neis[1], atom_y)
+        elif len(x_neis) == 2 and len(y_neis) == 3:
+            xvec = get_normal_vector(x_neis[0], x_neis[1], atom_x)
+            yvec = get_normal_vector(y_neis[0], y_neis[1], y_neis[2])
+        else:
+            return None
+        st = np.linalg.norm(xvec) * np.linalg.norm(yvec)
+        theta = np.arccos(np.inner(xvec, yvec) / st)
+        if np.degrees(theta) >= 90:
+            return False
+        else:
             return True
-        xvec = get_normal_vector(x_neis[0], x_neis[1], x_neis[2])
-        yvec = get_normal_vector(y_neis[0], y_neis[1], y_neis[2])
+
+    def get_arc_relationship_flag(atom_x: Atom, atom_y_list: list[Atom]) -> bool:
+        x_neis = atom_x.bonds
+        if len(x_neis) == 3 and len(atom_y_list) == 3:
+            xvec = get_normal_vector(x_neis[0], x_neis[1], x_neis[2])
+            yvec = get_normal_vector(atom_y_list[0], atom_y_list[1], atom_y_list[2])
+        else:
+            return None
         st = np.linalg.norm(xvec) * np.linalg.norm(yvec)
         theta = np.arccos(np.inner(xvec, yvec) / st)
         if np.degrees(theta) >= 90:
@@ -1381,7 +1403,9 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
 
     logger.debug(f"ordering {len(atom_maps)} chains")
     evaluated_dicts = [{"map": mp} for mp in atom_maps]
-    for evaluated_dic in evaluated_dicts:
+    for chain_num, evaluated_dic in enumerate(evaluated_dicts, 1):
+        if chain_num % 10 == 0:
+            logger.debug(f"processing chains: {chain_num}")
         for a in atoms_a:
             a.cache["map_idx"] = None
         for a in atoms_b:
@@ -1421,20 +1445,6 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
             _b_bonds = pr[1].bonds
             for a_bonding in pr[0].bonds:
                 _aconv = aconv(a_bonding, atom_map)
-                if _aconv is not None and _aconv in _b_bonds:
-                    local_pairs.append((a_bonding, _aconv))
-            a_xyzs = np.array([tpr[0].xyz for tpr in local_pairs])
-            b_xyzs = np.array([tpr[1].xyz for tpr in local_pairs])
-            a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
-            b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
-            evaluated_dic["bonding_local_rmsd"] += _kabsch(a_xyzs, b_xyzs)
-
-        evaluated_dic["bonding_tb_local_rmsd"] = 0.0
-        for pr in bonding_pairs:
-            local_pairs: list[tuple[Atom]] = [pr]
-            _b_bonds = pr[1].bonds
-            for a_bonding in pr[0].bonds:
-                _aconv = aconv(a_bonding, atom_map)
                 if not (_aconv is not None and _aconv in _b_bonds):
                     continue
                 local_pairs.append((a_bonding, _aconv))
@@ -1447,7 +1457,8 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
             b_xyzs = np.array([tpr[1].xyz for tpr in local_pairs])
             a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
             b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
-            evaluated_dic["bonding_tb_local_rmsd"] += _kabsch(a_xyzs, b_xyzs)
+            evaluated_dic["bonding_local_rmsd"] += _kabsch(a_xyzs, b_xyzs)
+        evaluated_dic["bonding_local_rmsd"] = round(evaluated_dic["bonding_local_rmsd"], 1)
 
         evaluated_dic["local_rmsd"] = 0.0
         for pr in normal_pairs:
@@ -1468,6 +1479,13 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
             a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
             b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
             evaluated_dic["local_rmsd"] += _kabsch(a_xyzs, b_xyzs)
+        evaluated_dic["local_rmsd"] = round(evaluated_dic["local_rmsd"], 1)
+
+        a_xyzs = np.array([m[0].xyz for m in atom_map])
+        b_xyzs = np.array([m[1].xyz for m in atom_map])
+        a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
+        b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
+        evaluated_dic["total_rmsd"] = _kabsch(a_xyzs, b_xyzs)
 
         evaluated_dic["num_of_long_rearranged_atoms"] = 0
         for pr in bonding_pairs:
@@ -1493,43 +1511,125 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
                             continue
                         if a_bonding in [pr[0] for pr in bonding_pairs]:
                             evaluated_dic["num_of_long_rearranged_atoms"] += 1
-        evaluated_dic["num_of_long_rearranged_atoms"] /= 2
+        evaluated_dic["num_of_long_rearranged_atoms"] = int(evaluated_dic["num_of_long_rearranged_atoms"] / 2)
 
-        evaluated_dic["sp2_face_transfer_mismatch"] = 0
+        map_index_dict = {m[0]: idx for idx, m in enumerate(atom_map)} | {m[1]: idx for idx, m in enumerate(atom_map)}
         bonding_atoms = [p[0] for p in bonding_pairs] + [p[1] for p in bonding_pairs]
+        faces_dict: dict[tuple[int], bool] = {}
+        all_reactive_idx_dict: dict[int, int] = {}
         for pr in bonding_pairs + [(_pr[1], _pr[0]) for _pr in bonding_pairs]:
-            if pr[0].symbol != "C":
-                continue
-            if len(pr[0].single) != 4:
+            if len(aconv(pr[0], atom_map).double) != 1:
                 continue
             reactive_atoms = [a for a in pr[0].single if aconv(a, atom_map) not in pr[1].bonds]
             if len(reactive_atoms) != 1:
                 continue
+            all_reactive_idx_dict[map_index_dict[pr[0]]] = map_index_dict[reactive_atoms[0]]
             face_flag = get_reactive_face_flag(pr[0], reactive_atoms[0])
-
             stack: list[Atom] = [pr[1]]
-            loop_counter = 0
-            while stack:
-                loop_counter += 1
-                if loop_counter > 16:
+            involving_atom_number = 1
+            while True:
+                if involving_atom_number > 16:
                     break
-                twin_atom: Atom = stack.pop()
+                twin_atom: Atom = stack[-1]
                 twin_neighbors = twin_atom.double
-                if len(twin_neighbors) == 0 or twin_neighbors[0].symbol != "C":
-                    continue
-                if not get_relationship_flag(twin_atom, twin_neighbors[0]):
+                if len(twin_neighbors) != 1:
+                    break
+                if len(stack) >= 2 and twin_neighbors[0] is stack[-2]:
+                    break
+                rel_flag = get_relationship_flag(twin_atom, twin_neighbors[0])
+                if rel_flag is None or face_flag is None:
+                    face_flag = None
+                elif not rel_flag:
                     face_flag = not face_flag
                 my_neighbor = aconv(twin_neighbors[0], atom_map)
+                if len(stack) >= 2 and my_neighbor is stack[-2]:
+                    break
                 if my_neighbor in bonding_atoms:
                     my_neighbor_reactive_atoms = [
                         a for a in my_neighbor.single if aconv(a, atom_map) not in twin_neighbors[0].bonds
                     ]
                     if len(my_neighbor_reactive_atoms) != 1:
-                        continue
-                    if get_reactive_face_flag(my_neighbor, my_neighbor_reactive_atoms[0]) is not face_flag:
-                        evaluated_dic["sp2_face_transfer_mismatch"] += 1
+                        break
+                    stack.append(my_neighbor)
+                    stack_as_index = tuple(map_index_dict[a] for a in stack)
+                    if face_flag is None:
+                        faces_dict[stack_as_index] = None
+                        break
+                    next_face_flag = get_reactive_face_flag(my_neighbor, my_neighbor_reactive_atoms[0])
+                    if next_face_flag is None:
+                        faces_dict[stack_as_index] = None
+                        break
+                    faces_dict[stack_as_index] = next_face_flag is face_flag
+                    break
                 else:
                     stack.append(my_neighbor)
+                    involving_atom_number += 1
+        # logger.debug(f"faces_dict: {[([str(a) for a in face], faces_dict[face]) for face in faces_dict]}")
+        canonical_faces_dict: dict[tuple[int], bool] = {}
+        for f, syn_anti in faces_dict.items():
+            face = f
+            if f[0] > f[-1]:
+                face = tuple(reversed(f))
+            if canonical_faces_dict.get(face, syn_anti) is syn_anti:
+                canonical_faces_dict[face] = syn_anti
+            else:
+                logger.error(f"Conflicting faces detected: {face}")
+        # logger.debug(f"canonical_faces_dict: {canonical_faces_dict}")
+
+        # logger.debug(f"all_reactive_atoms: {all_reactive_idx_dict}")
+        pairwise_faces: list[dict[tuple[Atom], bool]] = []
+        for f in canonical_faces_dict:
+            reactive_ab = (all_reactive_idx_dict.get(f[0]), all_reactive_idx_dict.get(f[-1]))
+            # logger.debug(f"reactive_ab: {reactive_ab}")
+            if None in reactive_ab:
+                continue
+            for pair_f in canonical_faces_dict:
+                if reactive_ab == (pair_f[0], pair_f[-1]):
+                    pair_f_dict = {pair_f: canonical_faces_dict[pair_f]}
+                elif reactive_ab == (pair_f[-1], pair_f[0]):
+                    pair_f_dict = {tuple(reversed(pair_f)): canonical_faces_dict[pair_f]}
+                else:
+                    continue
+                new_pair_f_dict = {f: canonical_faces_dict[f]} | pair_f_dict
+                if new_pair_f_dict not in pairwise_faces:
+                    pairwise_faces.append(new_pair_f_dict)
+
+        # logger.debug(f"pairwise_faces: {pairwise_faces}")
+
+        evaluated_dic["antarafacial_penalty"] = len([sa for sa in pairwise_faces if False in sa.values()])
+        evaluated_dic["boat_transition_penalty"] = 0
+        for p in pairwise_faces:
+            if None not in p.values():
+                continue
+            if [len(f) for f in p.keys()] != [3, 3]:
+                continue
+            # logger.debug(f"potentially boat: {p}")
+            face_tuple = tuple(face for face in p.keys())
+            for ab_idx in (0, 1):
+                for face_a, face_b in (face_tuple, tuple(reversed(face_tuple))):
+                    face_a_atoms: list[Atom] = [atom_map[idx][ab_idx] for idx in face_a]
+                    face_a_twins: list[Atom] = [aconv(a, atom_map) for a in face_a_atoms]
+                    face_b_atoms: list[Atom] = [atom_map[idx][ab_idx] for idx in face_b]
+                    face_b_twins: list[Atom] = [aconv(a, atom_map) for a in face_b_atoms]
+                    if face_b_atoms[0] not in face_a_atoms[0].single or face_a_atoms[0] not in face_b_atoms[0].single:
+                        continue
+                    face_a_flag = get_reactive_face_flag(face_a_atoms[0], face_b_atoms[0])
+                    face_b_flag = get_reactive_face_flag(face_b_atoms[0], face_a_atoms[0])
+                    if None in (face_a_flag, face_b_flag):
+                        continue
+                    arc_a_flag = get_arc_relationship_flag(face_a_twins[0], face_a_twins)
+                    arc_b_flag = get_arc_relationship_flag(face_b_twins[0], face_b_twins)
+                    if None in (arc_a_flag, arc_b_flag):
+                        continue
+                    if arc_a_flag:
+                        face_a_flag = not face_a_flag
+                    if arc_b_flag:
+                        face_b_flag = not face_b_flag
+                    is_chair = face_a_flag ^ face_b_flag
+                    if not is_chair:
+                        evaluated_dic["boat_transition_penalty"] += 1
+
+        evaluated_dic["woodward_hoffmann_penalty"] = 0
 
         evaluated_dic["invalid_sn2_atoms"] = 0
         for pr in bonding_pairs:
@@ -1554,32 +1654,34 @@ def _order_maps(atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[A
             if det_chirality(*(a_ord_atoms + diff_a_atoms)) == det_chirality(*(b_ord_atoms + diff_b_atoms)):
                 evaluated_dic["invalid_sn2_atoms"] += 1
 
-        evaluated_dic["sp3_carbon_penalty"] = 0
+        evaluated_dic["reactive_sp3_carbon_penalty"] = 0
         for pr in bonding_pairs:
             if pr[0].symbol != "C" or pr[1].symbol != "C":
                 continue
             if len(pr[0].single) == 4 and len(pr[1].single) == 4:
-                evaluated_dic["sp3_carbon_penalty"] += 1
+                evaluated_dic["reactive_sp3_carbon_penalty"] += 1
 
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["total_rmsd"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["local_rmsd"])
-    # evaluated_dicts = sorted(evaluated_dicts, key=lambda d: round(d["bonding_local_rmsd"] * 0.5, 3))
-    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: round(d["bonding_tb_local_rmsd"], 1))
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["bonding_local_rmsd"])
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["boat_transition_penalty"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["invalid_sn2_atoms"])
-    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["sp2_face_transfer_mismatch"])
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["antarafacial_penalty"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["num_of_long_rearranged_atoms"])
-    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["sp3_carbon_penalty"])
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["reactive_sp3_carbon_penalty"])
     return_list = []
     for evaluated_dic in evaluated_dicts:
         mp = [(pr[0].number, pr[1].number) for pr in evaluated_dic["map"]]
         return_list.append(evaluated_dic["map"])
-        logger.info(f"mapping: {mp}")
-        logger.info(f"sp3_carbon_penalty: {evaluated_dic['sp3_carbon_penalty']}")
+        logger.info(f"chain: {mp}")
+        logger.info(f"reactive_sp3_carbon_penalty: {evaluated_dic['reactive_sp3_carbon_penalty']}")
         logger.info(f"num_of_long_rearranged_atoms: {evaluated_dic['num_of_long_rearranged_atoms']}")
-        logger.info(f"sp2_face_transfer_mismatch: {evaluated_dic['sp2_face_transfer_mismatch']}")
+        logger.info(f"antarafacial_penalty: {evaluated_dic['antarafacial_penalty']}")
         logger.info(f"invalid_sn2_atoms: {evaluated_dic['invalid_sn2_atoms']}")
-        logger.info(f"bonding_tb_local_rmsd: {evaluated_dic['bonding_tb_local_rmsd']}")
-        # logger.info(f"bonding_local_rmsd: {evaluated_dic['bonding_local_rmsd']}")
+        logger.info(f"boat_transition_penalty: {evaluated_dic['boat_transition_penalty']}")
+        logger.info(f"bonding_local_rmsd: {evaluated_dic['bonding_local_rmsd']}")
         logger.info(f"local_rmsd: {evaluated_dic['local_rmsd']}")
+        logger.info(f"total_rmsd: {evaluated_dic['total_rmsd']}")
 
     return return_list
 
