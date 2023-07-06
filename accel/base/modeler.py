@@ -412,10 +412,11 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = False,
+        chair_transition: bool = True,
     ) -> list[list[int]]:
         atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
-        atoms_map = _expand_maps(target, self.atoms, atoms_map)
-        atoms_map = _order_maps(target, self.atoms, atoms_map)
+        atoms_map = _correct_maps(target, self.atoms, atoms_map)
+        atoms_map = _order_maps(target, self.atoms, atoms_map, chair_transition=chair_transition)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
         return_chains = []
@@ -437,10 +438,11 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = False,
+        chair_transition: bool = True,
     ) -> list["Atoms"]:
         atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
-        atoms_map = _expand_maps(target, self.atoms, atoms_map)
-        atoms_map = _order_maps(target, self.atoms, atoms_map)
+        atoms_map = _correct_maps(target, self.atoms, atoms_map)
+        atoms_map = _order_maps(target, self.atoms, atoms_map, chair_transition=chair_transition)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
         return_list = []
@@ -761,6 +763,7 @@ def _get_maps(
     def _should_exclude(atom_a: Atom, atom_b: Atom):
         if atom_a in given_known_as and atom_b in given_known_bs:
             if given_known_as.index(atom_a) == given_known_bs.index(atom_b):
+                # logger.debug(f"cheking exclude_known: {exclude_known}")
                 if exclude_known:
                     return True
             else:
@@ -941,7 +944,8 @@ def _get_maps(
     #     logger.debug(f"h_matched_canonical_initial_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
     if (
-        len(h_matched_canonical_initial_chains) != 1
+        4 <= len(h_matched_canonical_initial_chains)
+        and len(h_matched_canonical_initial_chains) <= 8
         and max([len(chain) for chain in h_matched_canonical_initial_chains]) == 1
     ):
         logger.debug(f"generating combination_chains from {len(h_matched_canonical_initial_chains)} chains")
@@ -1168,15 +1172,93 @@ def _get_maps(
     for chain in canonical_extended_chains.values():
         logger.debug(f"canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
 
+    extracted_canonical_extended_chains: list[list[tuple[Atom]]] = []
     max_h_len = max(
         [len([None for pr in chain if pr[0].symbol != "H"]) for chain in canonical_extended_chains.values()]
     )
-
-    recursive_extended_chains: list[list[tuple[Atom]]] = []
     for chain in canonical_extended_chains.values():
         if max_h_len > len([None for pr in chain if pr[0].symbol != "H"]):
-            logger.debug(f"excluded canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
+            logger.debug(f"excluding canonical_extended_chains: {[(pr[0].number, pr[1].number) for pr in chain]}")
             continue
+        extracted_canonical_extended_chains.append(chain)
+
+    appended_ecec: list[list[tuple[Atom]]] = [ecec[len(known_pairs) :] for ecec in extracted_canonical_extended_chains]
+    while len(known_pairs) != 0 and len(appended_ecec) >= 4 and len(set([len(ecec) for ecec in appended_ecec])) == 1:
+        unit_bs = set([tuple(sorted([p[1] for p in pl], key=lambda a: a.number)) for pl in appended_ecec])
+        if len(unit_bs) == 1:
+            break
+        unit_as = set([tuple(sorted([p[0] for p in pl], key=lambda a: a.number)) for pl in appended_ecec])
+        if len(unit_as) == 1:
+            break
+
+        is_isolated = True
+        all_unit: set[tuple[Atom]] = unit_as | unit_bs
+        for unit in all_unit:
+            unit_bonding_atoms = []
+            for a in unit:
+                unit_bonding_atoms.extend(a.bonds)
+            if True in [a in (given_known_as + given_known_bs) for a in unit_bonding_atoms]:
+                is_isolated = False
+                break
+        if not is_isolated:
+            break
+
+        logger.debug(f"{max((len(unit_as), len(unit_bs)))} isolated molecules detected: initiating rmsd matching")
+        total_ecec: list[tuple[Atom]] = list(zip(given_known_as, given_known_bs))
+        while appended_ecec:
+            ecec_rmsds: list[float] = []
+            for ecec in appended_ecec:
+                tested_ecec = total_ecec + ecec
+                a_xyzs = np.array([tpr[0].xyz for tpr in tested_ecec])
+                b_xyzs = np.array([tpr[1].xyz for tpr in tested_ecec])
+                a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
+                b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
+                ecec_rmsds.append(_kabsch(a_xyzs, b_xyzs))
+            # logger.debug(f"ecec_rmsds: {ecec_rmsds}")
+            added_app_ecec = appended_ecec.pop(ecec_rmsds.index(min(ecec_rmsds)))
+            while len(added_app_ecec) == 1:
+                if added_app_ecec[0][0].symbol != "O":
+                    break
+                if added_app_ecec[0][1].symbol != "O":
+                    break
+                hs_in_a = added_app_ecec[0][0].bonds
+                if [a.symbol for a in hs_in_a] != ["H", "H"]:
+                    break
+                hs_in_b = added_app_ecec[0][1].bonds
+                if [a.symbol for a in hs_in_b] != ["H", "H"]:
+                    break
+                logger.debug(f"detected H2O without H at O{(added_app_ecec[0][0].number,added_app_ecec[0][0].number)}")
+                potential_h2os = [
+                    [(hs_in_a[0], hs_in_b[0]), (hs_in_a[1], hs_in_b[1])],
+                    [(hs_in_a[0], hs_in_b[1]), (hs_in_a[1], hs_in_b[0])],
+                ]
+                h2o_rmsds = []
+                for hs_h2o in potential_h2os:
+                    tested_ecec = total_ecec + added_app_ecec + hs_h2o
+                    a_xyzs = np.array([tpr[0].xyz for tpr in tested_ecec])
+                    b_xyzs = np.array([tpr[1].xyz for tpr in tested_ecec])
+                    a_xyzs = a_xyzs - np.mean(a_xyzs, axis=0)
+                    b_xyzs = b_xyzs - np.mean(b_xyzs, axis=0)
+                    h2o_rmsds.append(_kabsch(a_xyzs, b_xyzs))
+                added_app_ecec.extend(potential_h2os[h2o_rmsds.index(min(h2o_rmsds))])
+                break
+            total_ecec.extend(added_app_ecec)
+            added_appended_ecec_atoms_a = [p[0] for p in added_app_ecec]
+            added_appended_ecec_atoms_b = [p[1] for p in added_app_ecec]
+            new_appended_ecec = []
+            for ecec in appended_ecec:
+                if True in [p[0] in added_appended_ecec_atoms_a for p in ecec]:
+                    continue
+                if True in [p[1] in added_appended_ecec_atoms_b for p in ecec]:
+                    continue
+                new_appended_ecec.append(ecec)
+            # logger.debug(f"new_appended_ecec: {new_appended_ecec}")
+            appended_ecec = new_appended_ecec
+        extracted_canonical_extended_chains = [total_ecec]
+        break
+
+    recursive_extended_chains: list[list[tuple[Atom]]] = []
+    for chain in extracted_canonical_extended_chains:
         if len(chain) < min(len(atoms_a), len(atoms_b)):
             new_maps = _get_maps(
                 atoms_a,
@@ -1206,13 +1288,14 @@ def _get_maps(
     return list(canonical_recursive_extended_chains.values())
 
 
-def _expand_maps(
+def _correct_maps(
     atoms_a: "Atoms",
     atoms_b: "Atoms",
     atom_maps: list[list[tuple[Atom]]],
-    max_loop: int = 4,
+    max_loop: int = 3,
     max_different_bonds: int = 8,
     max_loop_rest_que: int = 8192,
+    acceptable_inflation_factor: int = 2,
 ) -> list[list[tuple[Atom]]]:
     def ab_conv(atom: Atom, atom_map: list[tuple[Atom]]) -> Atom:
         try:
@@ -1229,7 +1312,7 @@ def _expand_maps(
             return atom_map[idx][0]
         return None
 
-    logger.debug(f"expanding {len(atom_maps)} chains")
+    logger.debug(f"correcting {len(atom_maps)} chains")
     total_atom_maps_dict: dict[tuple[tuple[int]], list[tuple[Atom]]] = {}
     for atom_map in atom_maps:
         key = tuple(sorted([(mp[0].number, mp[1].number) for mp in atom_map], key=lambda t: t[0]))
@@ -1248,9 +1331,19 @@ def _expand_maps(
                     a_diff_bonds.append((ab_map[0], a_diff_bd))
             a_diff_bonds = list(set([tuple(sorted(adb, key=lambda a: a.number)) for adb in a_diff_bonds]))
             # logger.debug(f"a_diff_bonds: {[[a.number for a in adb] for adb in a_diff_bonds]}")
-            if len(a_diff_bonds) > max_diff_bonds:
-                # logger.debug(f"len(a_diff_bonds) exceeded last length {max_diff_bonds}")
+            if len(a_diff_bonds) > (acceptable_inflation_factor * max_diff_bonds):
+                logger.debug(f"len(a_diff_bonds) exceeded last length {acceptable_inflation_factor}x {max_diff_bonds}")
                 continue
+            if len(a_diff_bonds) >= 2:
+                all_adb = [adb[0] for adb in a_diff_bonds] + [adb[1] for adb in a_diff_bonds]
+                imaginary_bonds_candidate = [a for a in all_adb if all_adb.count(a) == 1]
+                while len(imaginary_bonds_candidate) == 2:
+                    if len([a for a in imaginary_bonds_candidate if a in [m[0] for m in initial_atom_map]]) == 2:
+                        break
+                    imaginary_bonds = tuple(sorted(imaginary_bonds_candidate, key=lambda a: a.number))
+                    logger.debug(f"imaginary_bond appended: {tuple(a.number for a in imaginary_bonds)}")
+                    a_diff_bonds.append(imaginary_bonds)
+                    break
             loop_rest_que: list[dict] = [
                 {
                     "loop_atoms": (adb[0],),
@@ -1305,15 +1398,25 @@ def _expand_maps(
                     continue
                 try:
                     p_id: int = atom_map_a.index(pq_swap[0])
+                except ValueError:
+                    p_id = None
+                try:
                     q_id: int = atom_map_a.index(pq_swap[1])
                 except ValueError:
-                    logger.error("error on swaping potential_swap")
-                    continue
+                    q_id = None
                 new_map = atom_map[:]
-                new_map[p_id], new_map[q_id] = (pq_swap[0], new_map[q_id][1]), (pq_swap[1], new_map[p_id][1])
+                if None not in (p_id, q_id):
+                    new_map[p_id], new_map[q_id] = (pq_swap[0], new_map[q_id][1]), (pq_swap[1], new_map[p_id][1])
+                elif p_id is not None:
+                    new_map[p_id] = (pq_swap[1], new_map[p_id][1])
+                elif q_id is not None:
+                    new_map[q_id] = (pq_swap[0], new_map[q_id][1])
+                else:
+                    logger.error("error on swapping potential_swap")
+                    continue
                 new_map_key = tuple(sorted([(mp[0].number, mp[1].number) for mp in new_map], key=lambda t: t[0]))
                 if new_map_key not in total_atom_maps_dict:
-                    logger.info(f"expanded_chains: {[(pr[0].number, pr[1].number) for pr in new_map]}")
+                    logger.info(f"corrected_chains: {[(pr[0].number, pr[1].number) for pr in new_map]}")
                     total_atom_maps_dict[new_map_key] = new_map
                     que_atom_maps.append((new_map, len(a_diff_bonds)))
             loop_counter += 1
@@ -1323,7 +1426,7 @@ def _expand_maps(
 
 
 def _order_maps(
-    atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]], chair=True, light=False
+    atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]], chair_transition: bool = True
 ) -> list[list[tuple[Atom]]]:
     def aconv(atom: Atom, a_map: list[tuple[Atom]]) -> Atom:
         try:
@@ -1518,10 +1621,20 @@ def _order_maps(
         faces_dict: dict[tuple[int], bool] = {}
         all_reactive_idx_dict: dict[int, int] = {}
         for pr in bonding_pairs + [(_pr[1], _pr[0]) for _pr in bonding_pairs]:
+            if pr[0].symbol == "H" and pr[1].symbol == "H":
+                pr0_single = pr[0].single
+                if len(pr0_single) != 1:
+                    continue
+                all_reactive_idx_dict[map_index_dict[pr[0]]] = map_index_dict[pr0_single[0]]
+                faces_dict[(map_index_dict[pr[0]],)] = True
+                # logger.debug(f"{(map_index_dict[pr[0]],)} was added as H")
+                continue
             if len(aconv(pr[0], atom_map).double) != 1:
                 continue
             reactive_atoms = [a for a in pr[0].single if aconv(a, atom_map) not in pr[1].bonds]
             if len(reactive_atoms) != 1:
+                continue
+            if map_index_dict.get(reactive_atoms[0]) is None:
                 continue
             all_reactive_idx_dict[map_index_dict[pr[0]]] = map_index_dict[reactive_atoms[0]]
             face_flag = get_reactive_face_flag(pr[0], reactive_atoms[0])
@@ -1626,10 +1739,21 @@ def _order_maps(
                     if arc_b_flag:
                         face_b_flag = not face_b_flag
                     is_chair = face_a_flag ^ face_b_flag
-                    if not is_chair:
+                    if chair_transition ^ is_chair:
                         evaluated_dic["boat_transition_penalty"] += 1
 
-        evaluated_dic["woodward_hoffmann_penalty"] = 0
+        evaluated_dic["h_shift_face_penalty"] = 0
+        for p in pairwise_faces:
+            if None in p.values():
+                continue
+            len_list = sorted([len(f) for f in p.keys()])
+            if len_list[0] != 1:
+                continue
+            if len_list[1] % 2 == 0:
+                continue
+            # logger.debug(f"{((len_list[1] - 1) / 2) % 2 == 0} : {[b for b in p.values()].count(True) == 2}")
+            if (((len_list[1] - 1) / 2) % 2 == 0) ^ ([b for b in p.values()].count(True) == 2):
+                evaluated_dic["h_shift_face_penalty"] += 1
 
         evaluated_dic["invalid_sn2_atoms"] = 0
         for pr in bonding_pairs:
@@ -1655,11 +1779,14 @@ def _order_maps(
                 evaluated_dic["invalid_sn2_atoms"] += 1
 
         evaluated_dic["reactive_sp3_carbon_penalty"] = 0
+        evaluated_dic["inconsistent_h_count"] = 0
         for pr in bonding_pairs:
             if pr[0].symbol != "C" or pr[1].symbol != "C":
                 continue
             if len(pr[0].single) == 4 and len(pr[1].single) == 4:
                 evaluated_dic["reactive_sp3_carbon_penalty"] += 1
+            if len([a for a in pr[0].bonds if a.symbol == "H"]) != len([a for a in pr[1].bonds if a.symbol == "H"]):
+                evaluated_dic["inconsistent_h_count"] += 1
 
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["total_rmsd"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["local_rmsd"])
@@ -1667,6 +1794,8 @@ def _order_maps(
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["boat_transition_penalty"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["invalid_sn2_atoms"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["antarafacial_penalty"])
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["h_shift_face_penalty"])
+    evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["inconsistent_h_count"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["num_of_long_rearranged_atoms"])
     evaluated_dicts = sorted(evaluated_dicts, key=lambda d: d["reactive_sp3_carbon_penalty"])
     return_list = []
@@ -1676,6 +1805,8 @@ def _order_maps(
         logger.info(f"chain: {mp}")
         logger.info(f"reactive_sp3_carbon_penalty: {evaluated_dic['reactive_sp3_carbon_penalty']}")
         logger.info(f"num_of_long_rearranged_atoms: {evaluated_dic['num_of_long_rearranged_atoms']}")
+        logger.info(f"inconsistent_h_count: {evaluated_dic['inconsistent_h_count']}")
+        logger.info(f"h_shift_face_penalty: {evaluated_dic['h_shift_face_penalty']}")
         logger.info(f"antarafacial_penalty: {evaluated_dic['antarafacial_penalty']}")
         logger.info(f"invalid_sn2_atoms: {evaluated_dic['invalid_sn2_atoms']}")
         logger.info(f"boat_transition_penalty: {evaluated_dic['boat_transition_penalty']}")
