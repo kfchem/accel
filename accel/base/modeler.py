@@ -307,7 +307,11 @@ class Modeler:
                 if len(db_bond[0].single) not in (2, 1):
                     continue
                 if with_num_chirality:
-                    root_next = sorted(root_atom.single, key=lambda a: a.number, reverse=True)[0]
+                    root_atom_single = root_atom.single
+                    if len(root_atom_single) == 0:
+                        logger.error(f"unexpected 0 length single bonds of {root_atom}")
+                        continue
+                    root_next = sorted(root_atom_single, key=lambda a: a.number, reverse=True)[0]
                     db_next = sorted(db_bond[0].single, key=lambda a: a.number, reverse=True)[0]
                     chiral = "n" + get_ez(root_next, root_atom, db_bond[0], db_next)
                     if len(db_bond[0].single) == 1:
