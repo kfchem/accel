@@ -1060,8 +1060,9 @@ def _get_maps(
                 not_large_as = [a for a in next_as if a not in large_as]
                 not_large_bs = [b for b in next_bs if b not in large_bs]
                 if len(not_large_as) == 1 and len(not_large_bs) == 1:
-                    _new_assign((not_large_as[0], not_large_bs[0]), root_pair)
-                    continue
+                    if not_large_as[0].symbol == not_large_bs[0].symbol:
+                        _new_assign((not_large_as[0], not_large_bs[0]), root_pair)
+                        continue
                 known_a1_idxs = [assigned_as.index(a) for a in root_pair[0].bonds if a in assigned_as]
                 known_b1_idxs = [assigned_bs.index(b) for b in root_pair[1].bonds if b in assigned_bs]
                 known_1idxs = list(set(known_a1_idxs) & set(known_b1_idxs))
@@ -1441,10 +1442,11 @@ def _order_maps(
 
     logger.debug(f"ordering {len(atom_maps)} chains")
     evaluation_template = {
+        "metathesis_point": 0,
         "reactive_sp3_carbon_penalty": 0,
-        "bad_breaking_bonds": 0,
+        "non_hydrogen_breaking_bonds": 0,
+        "heteroatoms_on_breaking_atoms": 0,
         "num_of_long_rearranged_atoms": 0,
-        "bad_breaking_bonds_sp2": 0,
         "inconsistent_h_count": 0,
         "h_shift_face_penalty": 0,
         "antarafacial_penalty": 0,
@@ -1733,40 +1735,53 @@ def _order_maps(
         breaking_bonds: list[tuple[Atom]] = list(
             {tuple(sorted(b, key=lambda a: a.number)): None for b in breaking_bonds}.keys()
         )
-        breaking_atoms: list[Atom] = [b[0] for b in breaking_bonds] + [b[1] for b in breaking_bonds]
-        for bb in breaking_bonds:
-            bb_symbols = tuple(a.symbol for a in bb)
-            if "H" in bb_symbols:
-                continue
-            if bb_symbols == ("C", "C"):
-                if (len(bb[0].bonds), len(bb[1].bonds)) == (3, 3):
-                    if (
-                        len([a for a in bb[0].bonds if a not in breaking_atoms]),
-                        len([a for a in bb[1].bonds if a not in breaking_atoms]),
-                    ) == (2, 2):
-                        continue
-                evaluated_dic["bad_breaking_bonds"] += 1
-                while (len(bb[0].single), len(bb[1].single)) == (4, 4):
-                    evaluated_dic["reactive_sp3_carbon_penalty"] += 1
+        non_hydrogen_breaking_bonds: list[tuple[Atom]] = [
+            b for b in breaking_bonds if "H" != b[0].symbol and "H" != b[1].symbol
+        ]
+        evaluated_dic["non_hydrogen_breaking_bonds"] += len(non_hydrogen_breaking_bonds)
+        for bb in non_hydrogen_breaking_bonds:
+            bbb_atoms: list[Atom] = []
+            bbb_atoms.extend([a for a in bb[0].bonds if a is not bb[1]] + [a for a in bb[1].bonds if a is not bb[0]])
+            bbb_atoms.extend([a for a in bb[0].double if a is not bb[1]] + [a for a in bb[1].double if a is not bb[0]])
+            bbb_atoms.extend(
+                [a for a in bb[0].aromatic if a is not bb[1]] + [a for a in bb[1].aromatic if a is not bb[0]]
+            )
+            bbb_atoms.extend([a for a in bb[0].triple if a is not bb[1]] + [a for a in bb[1].triple if a is not bb[0]])
+            bbb_atoms.extend([a for a in bb[0].triple if a is not bb[1]] + [a for a in bb[1].triple if a is not bb[0]])
+            evaluated_dic["heteroatoms_on_breaking_atoms"] -= len([a for a in bbb_atoms if a.symbol not in ("C", "H")])
+
+        non_hydrogen_breaking_atoms: list[Atom] = [bb[0] for bb in non_hydrogen_breaking_bonds] + [
+            bb[1] for bb in non_hydrogen_breaking_bonds
+        ]
+        bb_dict: dict[Atom, Atom] = {
+            bb[0]: bb[1] for bb in non_hydrogen_breaking_bonds if non_hydrogen_breaking_atoms.count(bb[0]) == 1
+        }
+        bb_dict.update(
+            {bb[1]: bb[0] for bb in non_hydrogen_breaking_bonds if non_hydrogen_breaking_atoms.count(bb[1]) == 1}
+        )
+
+        metathesis_point = 0
+        for start_atom in bb_dict:
+            next_atom = start_atom
+            for _ in range(4):
+                if next_atom.symbol != "C":
                     break
-            if bb_symbols in (("C", "O"), ("O", "C")):
-                if [a.symbol for a in bb[bb_symbols.index("O")].double] == ["C"]:
-                    evaluated_dic["bad_breaking_bonds"] += 1
-                    continue
-                nbas_symbols = tuple(a.symbol for a in bb[bb_symbols.index("O")].bonds)
-                if "S" in nbas_symbols:
-                    continue
-                if nbas_symbols in (("C", "H"), ("H", "C")):
-                    continue
-                if len([a for a in bb[bb_symbols.index("C")].bonds if a.symbol == "O"]) == 2:
-                    continue
-                evaluated_dic["bad_breaking_bonds"] += 1
-                if ["C", "C"] == [a.symbol for a in bb[bb_symbols.index("C")].bonds if a.symbol != "O"]:
-                    evaluated_dic["bad_breaking_bonds_sp2"] += 1
-            if bb_symbols in (("S", "O"), ("O", "S")):
-                evaluated_dic["bad_breaking_bonds"] += 1
-            if bb_symbols == ("O", "O"):
-                evaluated_dic["bad_breaking_bonds"] -= 1
+                next_atom = bb_dict.get(next_atom)
+                if next_atom is None:
+                    break
+                next_atom = ic(next_atom)
+                if next_atom is None:
+                    break
+            else:
+                if next_atom is start_atom:
+                    metathesis_point += 1
+        if metathesis_point == 8:
+            evaluated_dic["metathesis_point"] -= 1
+
+        for pr in bonding_pairs:
+            if pr[0].symbol == "C" and pr[1].symbol == "C":
+                if len(pr[0].bonds) == 4 and len(pr[1].bonds) == 4:
+                    evaluated_dic["reactive_sp3_carbon_penalty"] += 1
 
         for pr in bonding_pairs:
             if pr[0].symbol != "C" or pr[1].symbol != "C":
