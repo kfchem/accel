@@ -1258,10 +1258,9 @@ def _correct_maps(
     atoms_a: "Atoms",
     atoms_b: "Atoms",
     atom_maps: list[list[tuple[Atom]]],
-    max_loop: int = 3,
-    max_different_bonds: int = 8,
+    max_loop: int = 4,
     max_loop_rest_que: int = 8192,
-    acceptable_inflation_factor: int = 2,
+    max_diff_bonds: int = 8,
 ) -> list[list[tuple[Atom]]]:
     logger.debug(f"correcting {len(atom_maps)} chains")
     total_atom_maps_dict: dict[tuple[tuple[int]], list[tuple[Atom]]] = {}
@@ -1269,10 +1268,10 @@ def _correct_maps(
         key = tuple(sorted([(mp[0].number, mp[1].number) for mp in atom_map], key=lambda t: t[0]))
         total_atom_maps_dict[key] = atom_map
     for initial_atom_map in atom_maps:
-        que_atom_maps = [(initial_atom_map, max_different_bonds)]
+        que_atom_maps = [initial_atom_map]
         loop_counter = 0
         while que_atom_maps:
-            atom_map, max_diff_bonds = que_atom_maps.pop(0)
+            atom_map = que_atom_maps.pop(0)
             potential_swaps: list[list[Atom]] = []
             a_diff_bonds: list[tuple[Atom]] = []
             for ab_map in atom_map:
@@ -1281,8 +1280,8 @@ def _correct_maps(
                 for a_diff_bd in set([a for a in ab_map[0].bonds]) ^ set(a_diff_bd_from_b):
                     a_diff_bonds.append((ab_map[0], a_diff_bd))
             a_diff_bonds = list(set([tuple(sorted(adb, key=lambda a: a.number)) for adb in a_diff_bonds]))
-            if len(a_diff_bonds) > (acceptable_inflation_factor * max_diff_bonds):
-                logger.debug(f"len(a_diff_bonds) exceeded last length {acceptable_inflation_factor}x {max_diff_bonds}")
+            if len(a_diff_bonds) > max_diff_bonds:
+                logger.debug(f"len(a_diff_bonds) exceeded max_diff_bonds: {len(a_diff_bonds)}: exiting loop")
                 continue
             if len(a_diff_bonds) >= 2:
                 all_adb = [adb[0] for adb in a_diff_bonds] + [adb[1] for adb in a_diff_bonds]
@@ -1312,10 +1311,6 @@ def _correct_maps(
                 rest_bonds: list[tuple[Atom]] = q["rest_bonds"]
                 if loop_atoms[-1] is q["end_atom"]:
                     stored_loop_atoms.append(loop_atoms)
-                    if len(set([a.symbol for a in loop_atoms[::2]])) == 1:
-                        potential_swaps.append([a for a in loop_atoms[::2]])
-                    if len(set([a.symbol for a in loop_atoms[1::2]])) == 1:
-                        potential_swaps.append([a for a in loop_atoms[1::2]])
                 for checking_bond in rest_bonds:
                     if loop_atoms[-1] is checking_bond[0]:
                         new_terminal = checking_bond[1]
@@ -1340,6 +1335,8 @@ def _correct_maps(
                 key=lambda ap: ap[0].number,
             )
             atom_map_a = [m[0] for m in atom_map]
+            temporary_atom_maps_dict = {}
+            non_hydrogen_swap_counter = 0
             for pq_swap in potential_swaps:
                 if len(pq_swap) != 2:
                     continue
@@ -1363,11 +1360,19 @@ def _correct_maps(
                     continue
                 new_map_key = tuple(sorted([(mp[0].number, mp[1].number) for mp in new_map], key=lambda t: t[0]))
                 if new_map_key not in total_atom_maps_dict:
+                    if pq_swap[0].symbol != "H":
+                        non_hydrogen_swap_counter += 1
+                    temporary_atom_maps_dict[new_map_key] = new_map
+            if loop_counter == 0 or non_hydrogen_swap_counter <= 1:
+                for new_map_key, new_map in temporary_atom_maps_dict.items():
                     logger.info(f"corrected_chains: {[(pr[0].number, pr[1].number) for pr in new_map]}")
                     total_atom_maps_dict[new_map_key] = new_map
-                    que_atom_maps.append((new_map, len(a_diff_bonds)))
+                    que_atom_maps.append(new_map)
+            else:
+                logger.info(f"multiple non_hydrogen_swap_counter detected: {non_hydrogen_swap_counter}")
             loop_counter += 1
             if loop_counter >= max_loop:
+                logger.info(f"loop_counter: {loop_counter}")
                 break
     return list(total_atom_maps_dict.values())
 
@@ -1561,7 +1566,6 @@ def _order_maps(
                             continue
                         if a_bonding in [pr[0] for pr in bonding_pairs]:
                             evaluated_dic["num_of_long_rearranged_atoms"] += 1
-        evaluated_dic["num_of_long_rearranged_atoms"] = int(evaluated_dic["num_of_long_rearranged_atoms"] / 2)
 
         map_index_dict = {m[0]: idx for idx, m in enumerate(atom_map)} | {m[1]: idx for idx, m in enumerate(atom_map)}
         bonding_atoms = [p[0] for p in bonding_pairs] + [p[1] for p in bonding_pairs]
@@ -1739,6 +1743,7 @@ def _order_maps(
             b for b in breaking_bonds if "H" != b[0].symbol and "H" != b[1].symbol
         ]
         evaluated_dic["non_hydrogen_breaking_bonds"] += len(non_hydrogen_breaking_bonds)
+
         for bb in non_hydrogen_breaking_bonds:
             bbb_atoms: list[Atom] = []
             bbb_atoms.extend([a for a in bb[0].bonds if a is not bb[1]] + [a for a in bb[1].bonds if a is not bb[0]])
@@ -1766,6 +1771,8 @@ def _order_maps(
             for _ in range(4):
                 if next_atom.symbol != "C":
                     break
+                if len(next_atom.bonds) >= 4:
+                    break
                 next_atom = bb_dict.get(next_atom)
                 if next_atom is None:
                     break
@@ -1775,8 +1782,8 @@ def _order_maps(
             else:
                 if next_atom is start_atom:
                     metathesis_point += 1
-        if metathesis_point == 8:
-            evaluated_dic["metathesis_point"] -= 1
+        if metathesis_point != 0 and (metathesis_point % 8) == 0:
+            evaluated_dic["metathesis_point"] -= metathesis_point / 8
 
         for pr in bonding_pairs:
             if pr[0].symbol == "C" and pr[1].symbol == "C":
