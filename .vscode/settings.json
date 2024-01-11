@@ -3,21 +3,12 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": false,
     "editor.codeActionsOnSave": {
-        "source.organizeImports": true
+        "source.organizeImports": "explicit"
     },
     "terminal.integrated.env.windows": {
         "PYTHONPATH": "${env:PYTHONPATH};${workspaceRoot}"
     },
     "python.analysis.typeCheckingMode": "off",
-    "python.formatting.provider": "none",
-    "python.formatting.blackArgs": [
-        "--line-length=119"
-    ],
-    "python.linting.flake8Enabled": true,
-    "python.linting.flake8Args": [
-        "--max-line-length=119",
-        "--ignore=E203,W503,W504"
-    ],
     "python.testing.unittestArgs": [
         "-v",
         "-s",
@@ -29,6 +20,13 @@
     "python.testing.unittestEnabled": false,
     "files.eol": "\n",
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    }
+        "editor.defaultFormatter": "ms-python.black-formatter",
+    },
+    "black-formatter.args": [
+        "--line-length=119"
+    ],
+    "flake8.args": [
+        "--max-line-length=119",
+        "--ignore=E203,W503,W504",
+    ]
 }
