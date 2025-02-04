@@ -1,5 +1,4 @@
 import gzip
-import platform
 import subprocess
 import tempfile
 from collections import OrderedDict
@@ -105,9 +104,6 @@ def _embed_f_m_ct(c: System, f_m_ct: dict[str, Union[str, list]]):
         )
         if "i_m_formal_charge" in m_atom:
             c.atoms[-1].charge = int(m_atom["i_m_formal_charge"])
-    for a in c.atoms:
-        if a.charge is None:
-            continue
     for _m_bond in f_m_ct["m_bond"]:
         _number_a = int(_m_bond["i_m_from"])
         _number_b = int(_m_bond["i_m_to"])

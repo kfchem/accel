@@ -136,12 +136,6 @@ def read_mol(_c: System):
             prop = prop.split()
             for i in range(int(prop[2])):
                 _c.atoms.get(int(prop[(2 * i) + 3])).charge = int(prop[(2 * i) + 4])
-    _total_charge = 0
-    for _a in _c.atoms:
-        if _a.charge is None:
-            continue
-        _total_charge += _a.charge
-    _c.charge = _total_charge
     logger.debug(f"read {_c.name}")
 
 

@@ -109,10 +109,12 @@ class System:
         if self.total_charge is not None:
             return self.total_charge
         else:
-            try:
-                return sum(a.charge for a in self.atoms)
-            except TypeError:
-                return None
+            t_charge = 0
+            for a in self.atoms:
+                if a.charge is None:
+                    continue
+                t_charge += a.charge
+            return t_charge
 
     @charge.setter
     def charge(self, value):
