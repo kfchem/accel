@@ -35,19 +35,14 @@ class TxtBox(BoxCore):
 
     def delete_lines_by_key(self, keyword: str):
         for c in self.get():
-            ls: list[str] = c.data["txt"].split("\n")
-            for i, line in enumerate(ls):
-                if keyword in line:
-                    ls.pop(i)
-            c.data["txt"] = "\n".join(ls)
+            c.data["txt"] = "\n".join([line for line in c.data["txt"].split("\n") if keyword in line])
         return self
 
     def delete_lines(self, numbers: list[int]):
         for c in self.get():
-            ls: list[str] = c.data["txt"].split("\n")
-            for num in numbers:
-                ls.pop(int(num - 1))
-            c.data["txt"] = "\n".join(ls)
+            c.data["txt"] = "\n".join(
+                [line for num, line in enumerate(c.data["txt"].split("\n"), 1) if num not in numbers]
+            )
         return self
 
     def insert_lines(self, number: int, new_lines=""):

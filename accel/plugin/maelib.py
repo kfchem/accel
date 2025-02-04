@@ -105,12 +105,9 @@ def _embed_f_m_ct(c: System, f_m_ct: dict[str, Union[str, list]]):
         )
         if "i_m_formal_charge" in m_atom:
             c.atoms[-1].charge = int(m_atom["i_m_formal_charge"])
-    total_charge = 0
     for a in c.atoms:
         if a.charge is None:
             continue
-        total_charge += a.charge
-    c.charge = total_charge
     for _m_bond in f_m_ct["m_bond"]:
         _number_a = int(_m_bond["i_m_from"])
         _number_b = int(_m_bond["i_m_to"])
@@ -242,15 +239,6 @@ class MaeBox(BoxCore):
         return ret_box
 
     def write_mae(self, directory: Path = None):
-        schrodinger_version = "2021-2"
-        if platform.system() == "Windows":
-            Execmd.add(
-                "sdconvert", r"C:\Program Files\Schrodinger" + schrodinger_version + r"\utilities\sdconvert.exe"
-            )
-        elif platform.system() == "Linux":
-            Execmd.add("sdconvert", r"/opt/schrodinger" + schrodinger_version + "/utilities/sdconvert")
-        elif platform.system() == "Mac":
-            pass
         with tempfile.TemporaryDirectory() as tmp_dir:
             for c in self.get():
                 mol_path = write_mol(c, output_dir=tmp_dir, centering=False)

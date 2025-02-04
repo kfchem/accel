@@ -416,11 +416,11 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = None,
-        chair_transition: bool = True,
+        options: dict = {},
     ) -> list[list[int]]:
         atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _correct_maps(target, self.atoms, atoms_map)
-        atoms_map = _order_maps(target, self.atoms, atoms_map, chair_transition=chair_transition)
+        atoms_map = _order_maps(target, self.atoms, atoms_map, options=options)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
         return_chains = []
@@ -442,11 +442,11 @@ class Modeler:
         target: "Atoms",
         known_pairs: list[tuple[int]] = [],
         terminal_first: bool = None,
-        chair_transition: bool = True,
+        options: dict = {},
     ) -> list["Atoms"]:
         atoms_map = _get_maps(target, self.atoms, known_pairs=known_pairs, terminal_first=terminal_first)
         atoms_map = _correct_maps(target, self.atoms, atoms_map)
-        atoms_map = _order_maps(target, self.atoms, atoms_map, chair_transition=chair_transition)
+        atoms_map = _order_maps(target, self.atoms, atoms_map, options=options)
         for chain in atoms_map:
             logger.debug(f"maps (target, self): {[(pr[0].number, pr[1].number) for pr in chain]}")
         return_list = []
@@ -1378,7 +1378,10 @@ def _correct_maps(
 
 
 def _order_maps(
-    atoms_a: "Atoms", atoms_b: "Atoms", atom_maps: list[list[tuple[Atom]]], chair_transition: bool = True
+    atoms_a: "Atoms",
+    atoms_b: "Atoms",
+    atom_maps: list[list[tuple[Atom]]],
+    options: dict = {},
 ) -> list[list[tuple[Atom]]]:
     def get_normal_vector(a: Atom, b: Atom, c: Atom) -> np.ndarray:
         try:
@@ -1429,7 +1432,9 @@ def _order_maps(
         x_neis = atom_x.bonds
         if len(x_neis) == 3 and len(atom_y_list) == 3:
             xvec = get_normal_vector(x_neis[0], x_neis[1], x_neis[2])
-            yvec = get_normal_vector(atom_y_list[0], atom_y_list[1], atom_y_list[2])
+            vop = np.array(atom_y_list[1].xyz) - np.array(atom_y_list[0].xyz)
+            voq = np.array(atom_y_list[2].xyz) - np.array(atom_y_list[0].xyz)
+            yvec = np.cross(vop, voq)
         else:
             return None
         st = np.linalg.norm(xvec) * np.linalg.norm(yvec)
@@ -1453,17 +1458,32 @@ def _order_maps(
         "heteroatoms_on_breaking_atoms": 0,
         "num_of_long_rearranged_atoms": 0,
         "inconsistent_h_count": 0,
-        "h_shift_face_penalty": 0,
+        "pericyclic_face": 0,
         "antarafacial_penalty": 0,
         "invalid_sn2_atoms": 0,
         "boat_transition_penalty": 0,
+        "syn_or_anti_addition": 0,
         "bonding_local_rmsd": 0.0,
         "local_rmsd": 0.0,
         "total_rmsd": 0.0,
     }
     evaluated_dicts = [{"map": mp} | evaluation_template for mp in atom_maps]
+
+    for a in atoms_a:
+        a.cache["original_number"] = a.number
+    for b in atoms_b:
+        b.cache["original_number"] = b.number
+    mol_num_a = {}
+    mol_num_b = {}
+    for idx, atms in enumerate(Modeler(atoms_a).get_splitted()):
+        for a in atms:
+            mol_num_a[a.cache["original_number"]] = idx
+    for idx, atms in enumerate(Modeler(atoms_b).get_splitted()):
+        for b in atms:
+            mol_num_b[b.cache["original_number"]] = idx
+
     for chain_num, evaluated_dic in enumerate(evaluated_dicts, 1):
-        if chain_num % 10 == 0:
+        if chain_num % 20 == 0:
             logger.debug(f"processing: {chain_num}/{len(atom_maps)}")
         for a in atoms_a:
             a.cache["map_idx"] = None
@@ -1544,28 +1564,18 @@ def _order_maps(
         evaluated_dic["total_rmsd"] = _kabsch(a_xyzs, b_xyzs)
 
         for pr in bonding_pairs:
-            for a_bonding in pr[0].bonds:
-                if a_bonding in [pr[0] for pr in bonding_pairs]:
-                    if ic(a_bonding) is None:
-                        continue
-                    if ic(a_bonding) in pr[1].bonds:
-                        continue
-                    for b_bonding in ic(a_bonding).bonds:
-                        if ic(b_bonding) in a_bonding.bonds:
+            for i0, i1 in [(0, 1), (1, 0)]:
+                for a_bonding in pr[i0].bonds:
+                    if a_bonding in [pr[i0] for pr in bonding_pairs]:
+                        if ic(a_bonding) is None:
                             continue
-                        if b_bonding in [pr[1] for pr in bonding_pairs]:
-                            evaluated_dic["num_of_long_rearranged_atoms"] += 1
-            for b_bonding in pr[1].bonds:
-                if b_bonding in [pr[1] for pr in bonding_pairs]:
-                    if ic(b_bonding) is None:
-                        continue
-                    if ic(b_bonding) in pr[0].bonds:
-                        continue
-                    for a_bonding in ic(b_bonding).bonds:
-                        if ic(a_bonding) in b_bonding.bonds:
+                        if ic(a_bonding) in pr[i1].bonds:
                             continue
-                        if a_bonding in [pr[0] for pr in bonding_pairs]:
-                            evaluated_dic["num_of_long_rearranged_atoms"] += 1
+                        for b_bonding in ic(a_bonding).bonds:
+                            if ic(b_bonding) in a_bonding.bonds:
+                                continue
+                            if b_bonding in [pr[i1] for pr in bonding_pairs]:
+                                evaluated_dic["num_of_long_rearranged_atoms"] += 1
 
         map_index_dict = {m[0]: idx for idx, m in enumerate(atom_map)} | {m[1]: idx for idx, m in enumerate(atom_map)}
         bonding_atoms = [p[0] for p in bonding_pairs] + [p[1] for p in bonding_pairs]
@@ -1631,6 +1641,7 @@ def _order_maps(
                 else:
                     stack.append(my_neighbor)
                     involving_atom_number += 1
+
         canonical_faces_dict: dict[tuple[int], bool] = {}
         for f, syn_anti in faces_dict.items():
             face = f
@@ -1641,15 +1652,15 @@ def _order_maps(
             else:
                 logger.error(f"conflicting faces detected: {face}")
 
-        pairwise_faces: list[dict[tuple[Atom], bool]] = []
+        pairwise_faces: list[dict[tuple[int], bool]] = []
         for f in canonical_faces_dict:
-            reactive_ab = (all_reactive_idx_dict.get(f[0]), all_reactive_idx_dict.get(f[-1]))
-            if None in reactive_ab:
+            ridx = (all_reactive_idx_dict.get(f[0]), all_reactive_idx_dict.get(f[-1]))
+            if None in ridx:
                 continue
             for pair_f in canonical_faces_dict:
-                if reactive_ab == (pair_f[0], pair_f[-1]):
+                if ridx == (pair_f[0], pair_f[-1]):
                     pair_f_dict = {pair_f: canonical_faces_dict[pair_f]}
-                elif reactive_ab == (pair_f[-1], pair_f[0]):
+                elif ridx == (pair_f[-1], pair_f[0]):
                     pair_f_dict = {tuple(reversed(pair_f)): canonical_faces_dict[pair_f]}
                 else:
                     continue
@@ -1657,11 +1668,61 @@ def _order_maps(
                 if new_pair_f_dict not in pairwise_faces:
                     pairwise_faces.append(new_pair_f_dict)
 
+            if len(f) in (2, 3) and canonical_faces_dict[f] is not None:
+                a_same = mol_num_a[atom_map[ridx[0]][0].number] == mol_num_a[atom_map[ridx[1]][0].number]
+                b_same = mol_num_b[atom_map[ridx[0]][1].number] == mol_num_b[atom_map[ridx[1]][1].number]
+                rearrangement_flag = False
+                if not a_same and len(f) == 3:
+                    mol_num = mol_num_a[atom_map[f[0]][0].number]
+                    if mol_num == mol_num_a[atom_map[f[-1]][0].number]:
+                        if mol_num_a[atom_map[ridx[0]][0].number] == mol_num:
+                            rearrangement_flag = not rearrangement_flag
+                        if mol_num_a[atom_map[ridx[1]][0].number] == mol_num:
+                            rearrangement_flag = not rearrangement_flag
+                if not b_same and len(f) == 3:
+                    mol_num = mol_num_b[atom_map[f[0]][1].number]
+                    if mol_num == mol_num_b[atom_map[f[-1]][1].number]:
+                        if mol_num_b[atom_map[ridx[0]][1].number] == mol_num:
+                            rearrangement_flag = not rearrangement_flag
+                        if mol_num_b[atom_map[ridx[1]][1].number] == mol_num:
+                            rearrangement_flag = not rearrangement_flag
+                add_flags = (rearrangement_flag ^ canonical_faces_dict[f], a_same, b_same)
+                if add_flags in ((True, True, True), (False, True, False), (False, False, True)):
+                    evaluated_dic["syn_or_anti_addition"] -= 1
+
         evaluated_dic["antarafacial_penalty"] = len([sa for sa in pairwise_faces if False in sa.values()])
 
         for p in pairwise_faces:
-            if None not in p.values():
+            if None in p.values():
                 continue
+            fs = sorted(list(p.keys()), key=lambda f: len(f))
+            if len(fs) != 2 or len(fs[-1]) <= 3:
+                continue
+            if len(fs[0]) == 1 and len(fs[-1]) % 2 != 0:
+                fs_len = len(fs[-1]) + 1
+            elif fs[0] == tuple(reversed(fs[-1])) and len(fs[-1]) % 2 == 0:
+                fs_len = len(fs[-1])
+            else:
+                continue
+            if (fs_len % 4 == 0) ^ p[fs[-1]]:
+                evaluated_dic["pericyclic_face"] -= 1
+            else:
+                evaluated_dic["pericyclic_face"] += 1
+
+        for p in pairwise_faces:
+            fs = list(p.keys())
+            if len(fs) != 2:
+                continue
+            if fs[0] != tuple(reversed(fs[1])):
+                continue
+            if len(fs[0]) % 2 != 0:
+                continue
+            if (len(fs[0]) % 4 == 0) ^ p[fs[0]]:
+                evaluated_dic["pericyclic_face"] -= 1
+            else:
+                evaluated_dic["pericyclic_face"] += 1
+
+        for p in pairwise_faces:
             if [len(f) for f in p.keys()] != [3, 3]:
                 continue
             face_tuple = tuple(face for face in p.keys())
@@ -1681,24 +1742,13 @@ def _order_maps(
                     arc_b_flag = get_arc_relationship_flag(face_b_twins[0], face_b_twins)
                     if None in (arc_a_flag, arc_b_flag):
                         continue
-                    if arc_a_flag:
-                        face_a_flag = not face_a_flag
-                    if arc_b_flag:
-                        face_b_flag = not face_b_flag
-                    is_chair = face_a_flag ^ face_b_flag
-                    if chair_transition ^ is_chair:
+                    evaluated_dic["face_flags"] = (face_a_flag, face_b_flag, arc_a_flag, arc_b_flag)
+                    if not face_a_flag:
+                        arc_a_flag = not arc_a_flag
+                    if not face_b_flag:
+                        arc_b_flag = not arc_b_flag
+                    if arc_a_flag ^ arc_b_flag:
                         evaluated_dic["boat_transition_penalty"] += 1
-
-        for p in pairwise_faces:
-            if None in p.values():
-                continue
-            len_list = sorted([len(f) for f in p.keys()])
-            if len_list[0] != 1:
-                continue
-            if len_list[1] % 2 == 0:
-                continue
-            if (((len_list[1] - 1) / 2) % 2 == 0) ^ ([b for b in p.values()].count(True) == 2):
-                evaluated_dic["h_shift_face_penalty"] += 1
 
         for pr in bonding_pairs:
             if pr[0].symbol != pr[1].symbol:
@@ -1795,6 +1845,14 @@ def _order_maps(
                 continue
             if len([a for a in pr[0].bonds if a.symbol == "H"]) != len([a for a in pr[1].bonds if a.symbol == "H"]):
                 evaluated_dic["inconsistent_h_count"] += 1
+
+    for opt in options:
+        if opt in evaluation_template.keys():
+            logger.debug(f"{opt} was modified by option value: {options[opt]}")
+            for evaluated_dic in evaluated_dicts:
+                evaluated_dic[opt] *= options[opt]
+        else:
+            logger.error(f"ordering option not found: {opt}")
 
     for k in reversed(evaluation_template):
         evaluated_dicts = sorted(evaluated_dicts, key=lambda evaluated_dic: evaluated_dic[k])

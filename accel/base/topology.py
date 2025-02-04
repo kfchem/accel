@@ -1,6 +1,7 @@
 import itertools
 
 import numpy as np
+
 from accel.base.atoms import Atom, Atoms
 from accel.base.systems import System, Systems
 from accel.util.log import logger
