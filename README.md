@@ -1,108 +1,129 @@
 <p align="center">
-  <img src="./images/logo.svg" alt="ACCeL" width="200px">
+  <img src="./images/logo.png" alt="ACCeL Logo" width="200px">
 </p>
 
-#
-ACCeL is a python package that enables batch processing of conformational isomers, making it easy to create, run, and analyze files for computational chemistry programs and automate calculation processes.
-## Installation
-```
+# ACCeL
+
+**ACCeL** (Automated Conformer Calculations and Exploration Library) is a Python package designed to streamline the processing of conformational ensembles in computational chemistry. It provides an intuitive and flexible framework for managing large sets of molecular structures, automating workflows such as input generation, energy analysis, structure filtering, and file export. ACCeL supports various file formats and is well suited for processing quantum chemical outputs in a reproducible and scalable way.
+
+## 🔧 Installation
+
+Install ACCeL using pip:
+
+```bash
 pip install accel
 ```
-## Examples
-```
+
+## 🚀 Quick Start
+
+```python
 from accel import Box
-Box("*.log").read_atoms().read_energy().energy_limit().rmsd_limit().write_input("template_file.inp")
+
+Box("*.log")\
+    .read_atoms()\
+    .read_energy()\
+    .energy_limit()\
+    .rmsd_limit()\
+    .write_input("template_file.inp")
 ```
-## How to use "Box"
-![Box](./images/box_figure.png)
 
-#### `add(contents)`
-> Adds files to the Box. Contents can be specified flexibly as directory name, filename, wildcard, iterative object, etc.
-#### `read_atoms(filetype=None, **options)`
-> Read coordinate information and other information from files.
-#### `check_end(filetype=None, **options)`
-> Verify that output files are terminated successfully.
-#### `read_energy(filetype=None, **options)`
-> Read energy values from output files.
-#### `read_correction(filetype=None, **options)`
-> Read thermodynamic correction values from output files.
-#### `check_freq(filetype=None, **options)`
-> Read frequencis from files and check the number of imaginary frequencies.
-#### `run(filetype=None, **options)`
-> Execute files and wait for them to complete.
-#### `submit(filetype=None, **options)`
-> Execute all files immediately.
-#### `calc_free_energy(filetype=None, **options)`
-> Calculate the free energy using loaded values.
-#### `labeling(separator="_", index_list=[0, 1])`
-> Set the label name (isomer name other than the conformational isomer) automatically. By default, a conformation with the name `KEF20958_a_256` will have the label `KEF20958_a`. Therefore, it is recommended that the file name handled in ACCeL be BaseName_IsomerName_Number.
-#### `set_data(key, value=None)`
-> Set data in batches.
-#### `set_state(flag=True)`
-> Set state at once.
-#### `set_label(label="")`
-> Set label names in batches.
-#### `zero_fill(digit=3, separator="_", position=3)`
-> Fill in the numbers in the name with zeros. By default, `KEF20958_a_2` is set to `KEF20958_a_002`.
-#### `count(comment="")`
-> Count up the number of active systems with their respective labels.
-#### `export_data(filepath)`
-> Output information on the conformers to a CSV file.
-#### `energy_limit(threshold=3.0, max_limit=None, in_label=True)`
-> Enable only stable conformation (default 3.0 kcal/mol) per label.
-#### `calc_rel_energy(in_label=True)`
-> Convert energy values to relative values.
-#### `calc_distribution(in_label=True, temperature=298.15)`
-> The Boltzmann distribution is calculated according to energy values. By default, it is calculated for each label.
-#### `calc_energy(keys=[], unit=Units.kcal_mol)`
-> The data specified for `keys` are added together and the energy value is calculated.
-#### `copy_files(directory, change_path=False, suffix=None)`
-> Duplicate the file in `directory`.
-#### `search(directory=None, existing_check=True, suffix=None)`
-> Search for files with the same name in `directory`.
-#### `read_xyz()`
-> Read coordinate information, etc. from XYZ files (.xyz).
-#### `write_xyz(directory=None, change_path=True, centering=True)`
-> Export XYZ files.
-#### `read_mol()`
-> Read coordinate information, etc. from MOL files (.mol, .sdf, .sd).
-#### `write_mol(directory=None, change_path=True, centering=True)`
-> Export MOL files.
-#### `write_input(template, directory=None, change_path=True)`
-> Create an input file. The following keywords in the template will be replaced.
-> #NAME# -> name
-> #LABEL# -> label name
-> #AXYZ# -> Element name + XYZ list
-> #ATOMS# -> number of atoms
-> #CHG# -> charge
-> #MULT# -> multiplicity
-> #ENRGY# -> energy value
-> #PATH# -> file path
-> #DATA[]# -> data value
-#### `calc_bonds(cov_scaling=1.1, vdw_scaling=1.0)`
-> Embed bonding information. Necessary to calculate the symmetric information.
-#### `calc_symm(calc_all=True)`
-> Embed symmetry information; required for RMSD calculations.
-#### `rmsd_limit(threshold=0.01, all_combinations_of_confs=False, redundant_check=3, all_perturbation_of_rotamers=False)`
-> Disable one conformation among the conformations whose RMSD is less than a certain value. In other words, it removes the identical conformations. The default value is 0.01 angstrom.
-#### `map_numbers(reference_box=None)`
-> Correct misnumbering of the same substituent (e.g., two H's in methylene) between conformations.
-#### `calc_length(number_a, number_b, key="")`
-> Calculate the distance between atoms.
-#### `calc_dihedral(number_a, number_b, number_c, number_d, key="")`
-> Calculate the dihedral angle between atoms.
-#### `calc_angle(number_a, number_b, number_c, key="")`
-> Calculate the angle between atoms.
-#### `modify_length(number_a, number_b, target, fix_a=False, fix_b=False, numbers_along_with_a=[], numbers_along_with_b=[])`
-> Correct the distance between atoms.
-#### `convert_to_mirror(centering=True)`
-> Convert to a mirror image.
-#### `only_minimum(in_label=True)`
-> Enable only the most stable conformation. The default is to calculate with the respective label.
-#### `get() -> Systems`
-> Returns the Systems of the active coordination group.
-#### `get_average(keys=[], keys_for_atoms=[]) -> Systems`
-> Return Systems for the locus group with energy-weighted average data for each label.
-#### `duplicate() -> Box`
-> Returns a duplicate Box.
+This script performs the following:
 
+- Reads atomic coordinates and energy values from `.log` files.
+- Filters conformers based on energy and RMSD thresholds.
+- Generates input files using a specified template.
+
+## 📦 The `Box` Class
+
+The `Box` class serves as the core component of ACCeL, managing collections of molecular structures, typically conformers and their variants. Key functionalities include:
+
+- **File Management**: Add files or directories, read atomic coordinates, energies, and thermodynamic corrections.
+- **Validation**: Check for successful completion of calculations and analyze vibrational frequencies.
+- **Data Processing**: Calculate free energies, relative energies, and Boltzmann distributions.
+- **Structure Handling**: Filter conformers by energy or RMSD thresholds, generate mirror images, and modify molecular geometries.
+- **Input/Output**: Create input files from templates, export data to CSV, and read/write XYZ or MOL files.
+
+## 🖼️ Visual Overview
+
+<p align="center">
+  <img src="./images/box_figure.png" alt="Box Class Overview" width="600px">
+</p>
+
+## 📊 Method Overview
+
+| Method                                                                                                                  | Description                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `add(contents)`                                                                                                         | Add files or directories into the Box                                                                                                                                                                                                                                |
+| `read_atoms(filetype=None, **options)`                                                                                  | Read atomic coordinates and relevant information                                                                                                                                                                                                                     |
+| `check_end(filetype=None, **options)`                                                                                   | Check whether output files finished successfully                                                                                                                                                                                                                     |
+| `read_energy(filetype=None, **options)`                                                                                 | Extract energy values from output files                                                                                                                                                                                                                              |
+| `read_correction(filetype=None, **options)`                                                                             | Read thermodynamic correction values                                                                                                                                                                                                                                 |
+| `check_freq(filetype=None, **options)`                                                                                  | Analyze vibrational frequencies and imaginary modes                                                                                                                                                                                                                  |
+| `run(filetype=None, **options)`                                                                                         | Run calculations and wait for completion                                                                                                                                                                                                                             |
+| `submit(filetype=None, **options)`                                                                                      | Submit all calculations immediately without waiting                                                                                                                                                                                                                  |
+| `calc_free_energy(filetype=None, **options)`                                                                            | Calculate Gibbs free energy by combining electronic energy and thermodynamic correction values                                                                                                                                                                       |
+| `labeling(separator="_", index_list=[0, 1])`                                                                            | Automatically set labels based on filename patterns. For example, a file named `KEF20958_a_256.log` will be labeled as `KEF20958_a` if `separator="_"` and `index_list=[0, 1]`. This helps group conformers under common labels for energy comparison and filtering. |
+| `set_data(key, value=None)`                                                                                             | Batch-set arbitrary metadata                                                                                                                                                                                                                                         |
+| `set_state(flag=True)`                                                                                                  | Batch-enable or disable entries                                                                                                                                                                                                                                      |
+| `set_label(label="")`                                                                                                   | Assign label names in bulk                                                                                                                                                                                                                                           |
+| `zero_fill(digit=3, separator="_", position=3)`                                                                         | Zero-pad numeric suffixes in names. For example, `KEF20958_a_2` becomes `KEF20958_a_002` when `digit=3`, `separator="_"`, and `position=3`. This ensures proper alphanumeric sorting of filenames.                                                                   |
+| `count(comment="")`                                                                                                     | Count the number of active entries by label                                                                                                                                                                                                                          |
+| `export_data(filepath)`                                                                                                 | Output data to CSV file                                                                                                                                                                                                                                              |
+| `energy_limit(threshold=3.0, max_limit=None, in_label=True)`                                                            | Filter conformers by relative energy threshold                                                                                                                                                                                                                       |
+| `calc_rel_energy(in_label=True)`                                                                                        | Convert energy values to relative values within each label group                                                                                                                                                                                                     |
+| `calc_distribution(in_label=True, temperature=298.15)`                                                                  | Calculate Boltzmann-weighted populations                                                                                                                                                                                                                             |
+| `calc_energy(keys=[], unit=Units.kcal_mol)`                                                                             | Calculate total energy using specified keys                                                                                                                                                                                                                          |
+| `copy_files(directory, change_path=False, suffix=None)`                                                                 | Copy files to specified directory                                                                                                                                                                                                                                    |
+| `search(directory=None, existing_check=True, suffix=None)`                                                              | Search for files with matching names                                                                                                                                                                                                                                 |
+| `read_xyz()`                                                                                                            | Read XYZ coordinate files                                                                                                                                                                                                                                            |
+| `write_xyz(directory=None, change_path=True, centering=True)`                                                           | Export XYZ files                                                                                                                                                                                                                                                     |
+| `read_mol()`                                                                                                            | Read MOL-format structure files                                                                                                                                                                                                                                      |
+| `write_mol(directory=None, change_path=True, centering=True)`                                                           | Export MOL files                                                                                                                                                                                                                                                     |
+| `write_input(template, directory=None, change_path=True)`                                                               | Generate input files using template variables                                                                                                                                                                                                                        |
+| `calc_bonds(cov_scaling=1.1, vdw_scaling=1.0)`                                                                          | Calculate bonding information for symmetry calculations                                                                                                                                                                                                              |
+| `calc_symm(calc_all=True)`                                                                                              | Calculate symmetry data required for RMSD                                                                                                                                                                                                                            |
+| `rmsd_limit(threshold=0.01, all_combinations_of_confs=False, redundant_check=3, all_perturbation_of_rotamers=False)`    | Filter out redundant structures based on RMSD                                                                                                                                                                                                                        |
+| `map_numbers(reference_box=None)`                                                                                       | Align atom numbering between conformers to ensure consistent indexing, particularly for symmetric atoms (e.g., hydrogens in methylene groups). Useful for accurate comparison of geometries and RMSD calculations.                                                   |
+| `calc_length(number_a, number_b, key="")`                                                                               | Calculate interatomic distances                                                                                                                                                                                                                                      |
+| `calc_dihedral(number_a, number_b, number_c, number_d, key="")`                                                         | Calculate dihedral angles                                                                                                                                                                                                                                            |
+| `calc_angle(number_a, number_b, number_c, key="")`                                                                      | Calculate bond angles                                                                                                                                                                                                                                                |
+| `modify_length(number_a, number_b, target, fix_a=False, fix_b=False, numbers_along_with_a=[], numbers_along_with_b=[])` | Modify bond lengths between atoms                                                                                                                                                                                                                                    |
+| `convert_to_mirror(centering=True)`                                                                                     | Generate mirror images of structures                                                                                                                                                                                                                                 |
+| `only_minimum(in_label=True)`                                                                                           | Keep only the lowest-energy conformer per label                                                                                                                                                                                                                      |
+| `get()`                                                                                                                 | Return a `Systems` object representing active conformers. This object behaves similarly to a list but includes additional methods for structure handling and analysis.                                                                                               |
+| `get_average(keys=[], keys_for_atoms=[])`                                                                               | Return a `Systems` object containing Boltzmann-averaged data per label                                                                                                                                                                                               |
+| `duplicate()`                                                                                                           | Return a copy of the Box object                                                                                                                                                                                                                                      |
+
+## 📝 Template Keywords
+
+When generating input files, the following placeholders in your template will be replaced:
+
+- `#NAME#`: File name without extension
+- `#LABEL#`: Label name
+- `#AXYZ#`: Atomic symbols with XYZ coordinates
+- `#ATOMS#`: Number of atoms
+- `#CHG#`: Molecular charge
+- `#MULT#`: Spin multiplicity
+- `#ENRGY#`: Energy value
+- `#PATH#`: File path
+- `#DATA[]#`: Custom data values (e.g., `#DATA[rmsd]#` to insert the RMSD value if previously set)
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🗂️ Project Information
+
+- **Repository**: [github.com/kfchem/accel](https://github.com/kfchem/accel)
+- **Author**: Keisuke Fukaya
+- **License**: MIT
+- **Python Compatibility**: Python 3.9+
+- **Keywords**: conformer, quantum chemistry, automation, batch processing
+
+## 📬 Contact
+
+For bug reports or feature requests, please open an issue on the [GitHub repository](https://github.com/kfchem/accel/issues).
+
+For other inquiries (e.g., academic or collaboration-related), feel free to contact the author via email: [kfukaya@pu-toyama.ac.jp](mailto:kfukaya@pu-toyama.ac.jp)
+
+Thank you for your interest in ACCeL!
