@@ -2,17 +2,15 @@ from pathlib import Path
 
 from setuptools import find_packages, setup
 
-with open("README.rst") as f:
-    readme = f.read()
-
 with Path("accel").joinpath("__init__.py").open("r") as f:
     _version = f.readline().split()[2].replace("'", "").replace('"', "")
 
 setup(
     name="accel",
     version=_version,
-    description="automated computation chemical library specialized for handling large numbers of conformers",
-    long_description=readme,
+    description="ACCeL is a Python package for managing and filtering conformers in computational chemistry.",
+    long_description=open("README.rst", encoding="utf-8").read(),
+    long_description_content_type="text/x-rst",
     author="Keisuke Fukaya",
     author_email="kfukaya@pu-toyama.ac.jp",
     url="https://github.com/kfchem/accel",
