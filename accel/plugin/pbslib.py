@@ -29,6 +29,9 @@ def que_wait(box: BoxCore, interval_time=10):
     while len(job_ids) != 0:
         time.sleep(interval_time)
         proc = subprocess.run([Execmd.get("qstat")], stdout=subprocess.PIPE)
+        if proc.returncode != 0:
+            logger.error("qstat failed")
+            continue
         proc_list = proc.stdout.decode("utf-8").split("\n")
         proc_list = [_l.split()[0] for _l in proc_list[2:] if len(_l) != 0]
         for job_id in job_ids[:]:
