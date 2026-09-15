@@ -82,7 +82,7 @@ Windows. External programs (Gaussian, ORCA, xTB, qsub) are never required in tes
 
 ## Working rules
 
-- Work on a branch; never commit, push or merge to `master` directly; never force-push.
+- Work on a branch named `agent/...`; never commit, push or merge to `master` directly; never force-push.
 - Keep diffs focused: no mass reformatting (the code base uses black-style, line
   length 119), no unrelated refactors, no drive-by fixes of scientific code.
 - Tests must not need Gaussian/ORCA/xTB/schedulers. Use minimal synthetic excerpts
@@ -90,3 +90,44 @@ Windows. External programs (Gaussian, ORCA, xTB, qsub) are never required in tes
   be derived independently.
 - `accel.util.log` writes a `.mcl` log file at interpreter exit into the last input
   directory; keep test data in `tmp_path`.
+
+## Communication and GitHub workflow
+
+Permanent rules; they apply to every session.
+
+### Language
+
+- **User communication in Claude is in Japanese.** Design discussion, questions,
+  confirmations, presented options, progress updates, explanations of implemented
+  work and final reports are written in Japanese in the Claude conversation.
+- **All GitHub-facing content must be in English**: branch names, commit messages,
+  Pull Request titles, descriptions and comments, Issue titles, descriptions and
+  comments, release notes, and any other text published on GitHub. Never write
+  Japanese on GitHub.
+
+### Where discussion happens
+
+- **Design discussions and clarification requests happen in the Claude conversation,
+  not in Pull Requests or Issues.** Never open a PR or Issue just to ask a question,
+  and never use a PR body as a design-discussion log.
+
+### Decisions
+
+- **Routine implementation decisions are made autonomously**, based on the existing
+  code, tests, documentation and the v2.0 design principles above.
+- **Discuss with the user before finalising important decisions**, in Japanese in the
+  Claude conversation: anything affecting scientific meaning or results, existing Box
+  compatibility, Flow UX, Structure identity, cache / invalidation / incremental
+  recomputation semantics, Template semantics, the public API, or the overall v2.0
+  architecture.
+
+### Pull Requests
+
+- **A Pull Request is a review-ready implementation unit** for final human review,
+  not a place for design discussion or interim confirmation.
+- One task = one `agent/` working branch = one final Pull Request.
+- A finished PR description is concise English and covers: Purpose, Summary of
+  changes, Important design decisions, Tests and validation, Known limitations,
+  Items requiring human review.
+- Never merge your own Pull Request. Never close or delete existing Pull Requests or
+  branches without an explicit instruction from the user.
