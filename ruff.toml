@@ -1,0 +1,8 @@
+# Minimal static checks run in CI.
+# Deliberately narrow (syntax errors, undefined names, unused imports/variables) so that
+# the existing code passes without a mass reformat. Widen the rule set gradually.
+line-length = 119
+target-version = "py39"
+
+[lint]
+select = ["E9", "F63", "F7", "F82", "F401", "F811", "F841"]

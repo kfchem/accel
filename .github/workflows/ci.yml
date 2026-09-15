@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: python -m pip install ruff
+      - name: Static checks (ruff, minimal rule set in ruff.toml)
+        run: ruff check .
+      - name: Byte-compile all modules
+        run: python -m compileall -q accel
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip install -r requirements-dev.txt
+      - name: Import smoke test (installed package, outside the source tree)
+        working-directory: ${{ runner.temp }}
+        run: python -c "import accel; from accel import Box, System, Systems, Atom, Atoms; print(accel.__version__, accel.__file__)"
+      - name: Baseline tests
+        run: python -m pytest
