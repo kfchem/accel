@@ -141,3 +141,5 @@ cython_debug/
 tests/test_output/
 tests/test_files/
 tests/*
+# tracked baseline suite (see pytest.ini)
+!tests/baseline/
