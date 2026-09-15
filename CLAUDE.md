@@ -104,6 +104,8 @@ Permanent rules; they apply to every session.
   Pull Request titles, descriptions and comments, Issue titles, descriptions and
   comments, release notes, and any other text published on GitHub. Never write
   Japanese on GitHub.
+- **Documentation committed to the repository is English too** (README, `CLAUDE.md`,
+  everything under `docs/`, code comments), since it is published on GitHub.
 
 ### Where discussion happens
 
