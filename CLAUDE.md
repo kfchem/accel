@@ -34,7 +34,6 @@ Windows. External programs (Gaussian, ORCA, xTB, qsub) are never required in tes
 - `accel/base/topology.py`, `accel/base/modeler.py` - RMSD pruning, atom mapping, bonds, symmetry, stereo
 - `accel/plugin/*lib.py` - program plugins (Gaussian, ORCA, xTB, Maestro, PBS, text)
 - `tests/baseline/` - characterisation tests that pin current behaviour
-- `docs/v2/foundation-audit.md` - audit of v0.3 and the v2.0 migration plan
 
 ## Design principles (v2.0 and beyond)
 
@@ -77,8 +76,7 @@ Windows. External programs (Gaussian, ORCA, xTB, qsub) are never required in tes
 15. **Separate calculation from analysis.** Input generation, execution, result
     parsing and scientific analysis must be usable independently.
 16. **Structure identity / cache validity have scientific meaning.** Do not decide
-    them implicitly (e.g. by path or filename alone); follow the open questions in
-    `docs/v2/foundation-audit.md` and get explicit decisions.
+    them implicitly (e.g. by path or filename alone); agree them with the user first.
 
 ## Working rules
 
@@ -112,6 +110,9 @@ Permanent rules; they apply to every session.
 - **Design discussions and clarification requests happen in the Claude conversation,
   not in Pull Requests or Issues.** Never open a PR or Issue just to ask a question,
   and never use a PR body as a design-discussion log.
+- **Only finished work is published.** Audits, design notes, interim reports and
+  anything that is not part of the deliverable stay local in `.local/` (gitignored);
+  do not commit them. Keep everything that does reach GitHub minimal.
 
 ### Decisions
 
@@ -128,8 +129,7 @@ Permanent rules; they apply to every session.
 - **A Pull Request is a review-ready implementation unit** for final human review,
   not a place for design discussion or interim confirmation.
 - One task = one `agent/` working branch = one final Pull Request.
-- A finished PR description is concise English and covers: Purpose, Summary of
-  changes, Important design decisions, Tests and validation, Known limitations,
-  Items requiring human review.
+- A finished PR description is concise English and covers only **Purpose** and
+  **Summary of changes**.
 - Never merge your own Pull Request. Never close or delete existing Pull Requests or
   branches without an explicit instruction from the user.
